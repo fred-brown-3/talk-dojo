@@ -52,16 +52,18 @@ export class CertificationManager {
   /**
    * Snapshot and Certify: Captures the configuration set and executes the test bank
    */
-  async snapshotAndCertify({ accountId, assistantId, bankId = 'default-bank', mode = 'text', onProgress = null }) {
+  async snapshotAndCertify({ accountId, bankId = 'default-bank', mode = 'text', onProgress = null }) {
     const account = await this.accountManager.getAccount(accountId);
-    const assistant = await this.accountManager.getAssistant(accountId, assistantId);
+    const assistant = await this.accountManager.getAssistant(accountId);
     const virtualTools = await this.virtualToolManager.listTools(accountId);
     const companyInfo = await this.accountManager.getCompanyInfo(accountId);
     const enabledPolicies = await this.accountManager.listPolicies(accountId, 'all_enabled');
     const enabledProcedures = await this.accountManager.listProcedures(accountId, 'enabled');
 
     if (!account) throw new Error(`Account ${accountId} not found`);
-    if (!assistant) throw new Error(`Assistant ${assistantId} not found`);
+    if (!assistant) throw new Error(`Assistant for account ${accountId} not found`);
+
+    const assistantId = assistant.id;
 
     const snapshotId = `cert-${Date.now()}`;
     const snapshot = {

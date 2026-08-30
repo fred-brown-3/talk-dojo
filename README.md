@@ -36,8 +36,9 @@ Talk Dojo is an enterprise voice-to-voice testing laboratory, sparring arena, an
 - **Coverage Detection**: Enabled policies and procedures without an enabled test are highlighted as gaps.
 - **Certification Runtime Mapping**: Linked procedure actions become the assistant's isolated test toolbelt, while customer personas receive private roleplay instructions.
 
-### 6. 🤖 Virtual Assistants Studio & Gemini Live Audio Previews
-- **Authentic Personas**: Configure names, backstories, personality styles, and conversational guidelines.
+### 6. 🤖 Single Account Assistant & Gemini Live Audio Previews
+- **One Assistant per Account**: Each organization owns exactly one editable assistant stored in `assistant.yaml`; there is no assistant list or selector.
+- **Authentic Persona**: Configure its name, backstory, personality style, and conversational guidelines.
 - **Gemini Live Bidi WebSocket Audio Previews**: Streams native audio directly from Google's Gemini Live API (`gemini-2.5-flash-native-audio-latest`), cached on disk in `data/voice-previews/` for static-free, zero-latency 10-second previews across all 5 voices:
   - `Aoede`: Warm, breezy & natural female timbre (~240 Hz).
   - `Fenrir`: Deep, resonant & authoritative male timbre (~110 Hz).
@@ -68,8 +69,9 @@ Talk Dojo uses parent account GUIDs for deep linking across all views:
 3. 📜 Policies             -> /#/account/:accountId/policies/all_enabled?id=<policyId>
 4. 📋 Procedures           -> /#/account/:accountId/procedures/all_enabled?id=<procId>
 5. 🏦 Test Scenarios       -> /#/account/:accountId/testscenarios/all?id=<testId> | /#/account/:accountId/testscenarios/new
-6. 🤖 Assistants           -> /#/account/:accountId/assistants/all?id=<asstId>  |  /#/account/:accountId/assistants/new
+6. 🤖 Assistant            -> /#/account/:accountId/assistant/edit
 7. 🏆 Certification        -> /#/account/:accountId/certification/history  |  /#/account/:accountId/certification/new
+8. ⚙️ Account Settings     -> /#/account/:accountId/accountsettings/overview
 ```
 
 Sharing any URL automatically opens the exact account context, tab, sub-filter, and selected entity.
@@ -157,6 +159,7 @@ Testing Standalone Test Scenarios & Certification Runtime Mapping...
 ## 🔒 Security & Data Privacy
 
 - **No Secrets in Git**: Runtime accounts, policy records, user files, call audio recordings, and credentials are strictly excluded via `.gitignore`.
+- **Singleton Assistant Schema**: Every account has one `assistant.yaml`; legacy plural assistant files are collapsed destructively to one retained assistant.
 - **Soft-Delete Recycle Bin**: Deletions are safely staged in `recycle-bin/` where they can be restored or cleared to an immutable audit archive.
 - **Isolated Sandboxes**: Tool execution data is strictly isolated per agent toolbelt.
 

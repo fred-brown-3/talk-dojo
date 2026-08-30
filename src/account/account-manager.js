@@ -1,7 +1,7 @@
 /**
  * Account & Workspace Storage Manager for Talk Dojo
  * Manages Customer Accounts, Dynamic Markdown Company Info, Policies (Always/Never/Conditional),
- * Procedures (Workflows, Tool Constraints & Integrated Test Scenarios), Assistants, and Recycle Bin.
+ * Procedures (Workflows, Tool Constraints & Integrated Test Scenarios), one Assistant per account, and Recycle Bin.
  */
 
 import fs from 'fs/promises';
@@ -18,6 +18,7 @@ export class AccountManager {
   async init() {
     await fs.mkdir(this.baseDir, { recursive: true });
     await this.migrateLegacyAccounts();
+    await this.migrateSingleAssistantSchema();
     await this.initDefaultSeedAccounts();
   }
 
@@ -56,6 +57,65 @@ export class AccountManager {
     } catch (e) {}
   }
 
+  async migrateSingleAssistantSchema() {
+    const accountEntries = await fs.readdir(this.baseDir, { withFileTypes: true });
+    for (const accountEntry of accountEntries.filter(entry => entry.isDirectory())) {
+      const accountDir = path.join(this.baseDir, accountEntry.name);
+      const assistantFile = path.join(accountDir, 'assistant.yaml');
+      const legacyDir = path.join(accountDir, 'assistants');
+
+      let retained = null;
+      try {
+        retained = yaml.parse(await fs.readFile(assistantFile, 'utf8'));
+      } catch (e) {}
+
+      if (!retained) {
+        try {
+          const files = (await fs.readdir(legacyDir))
+            .filter(file => file.endsWith('.yaml') || file.endsWith('.yml'))
+            .sort((a, b) => {
+              const preferred = value => /sarah-lou|eleanor|chloe/i.test(value) ? 0 : 1;
+              return preferred(a) - preferred(b) || a.localeCompare(b);
+            });
+          if (files.length > 0) {
+            retained = yaml.parse(await fs.readFile(path.join(legacyDir, files[0]), 'utf8'));
+            retained.id = retained.id || path.basename(files[0], path.extname(files[0]));
+            await fs.writeFile(assistantFile, yaml.stringify(retained), 'utf8');
+          }
+        } catch (e) {}
+      }
+
+      if (!retained) {
+        let accountName = 'this account';
+        try {
+          accountName = yaml.parse(await fs.readFile(path.join(accountDir, 'account.yaml'), 'utf8'))?.name || accountName;
+        } catch (e) {}
+        retained = {
+          id: 'assistant',
+          name: 'Your Assistant',
+          voice: 'Aoede',
+          personality_style: 'Professional & Courteous',
+          backstory: `The primary telephone assistant for ${accountName}.`,
+          conversational_rules: ['Greet callers warmly.', 'Speak clearly and keep responses concise.'],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        await fs.writeFile(assistantFile, yaml.stringify(retained), 'utf8');
+      }
+
+      await fs.rm(legacyDir, { recursive: true, force: true });
+
+      const recycleFile = path.join(accountDir, 'recycle-bin', 'items.json');
+      try {
+        const items = JSON.parse(await fs.readFile(recycleFile, 'utf8'));
+        const withoutAssistants = items.filter(item => item.type !== 'assistant');
+        if (withoutAssistants.length !== items.length) {
+          await fs.writeFile(recycleFile, JSON.stringify(withoutAssistants, null, 2), 'utf8');
+        }
+      } catch (e) {}
+    }
+  }
+
   // --- ACCOUNTS CRUD ---
 
   async listAccounts() {
@@ -81,13 +141,18 @@ export class AccountManager {
       const data = yaml.parse(raw);
       data.id = accountId;
 
-      // Count assistants, policies, procedures, and tests
-      const assistants = await this.listAssistants(accountId);
+      // Load the account's single assistant and entity counts
+      const assistant = await this.getAssistant(accountId);
       const policies = await this.listPolicies(accountId);
       const procedures = await this.listProcedures(accountId);
-      data.assistantsCount = assistants.length;
+      const tests = await this.listTests(accountId);
+      const tools = await new VirtualToolManager(this.baseDir).listTools(accountId);
+      data.assistant = assistant;
+      data.assistantName = assistant?.name || 'Assistant';
       data.policiesCount = policies.length;
       data.proceduresCount = procedures.length;
+      data.testsCount = tests.length;
+      data.toolsCount = tools.length;
 
       // Load company info markdown
       const compInfo = await this.getCompanyInfo(accountId);
@@ -105,7 +170,6 @@ export class AccountManager {
       : this.generateGuid('acct');
 
     const accountDir = path.join(this.baseDir, id);
-    await fs.mkdir(path.join(accountDir, 'assistants'), { recursive: true });
     await fs.mkdir(path.join(accountDir, 'policies'), { recursive: true });
     await fs.mkdir(path.join(accountDir, 'procedures'), { recursive: true });
     await fs.mkdir(path.join(accountDir, 'test-scenarios'), { recursive: true });
@@ -128,6 +192,17 @@ export class AccountManager {
     } else {
       // Ensure starter company info markdown exists
       await this.ensureDefaultCompanyInfo(id, payload.name);
+    }
+
+    if (!await this.getAssistant(id)) {
+      await this.saveAssistant(id, {
+        id: 'assistant',
+        name: 'Your Assistant',
+        voice: 'Aoede',
+        personality_style: 'Professional & Courteous',
+        backstory: `The primary telephone assistant for ${payload.name}.`,
+        conversational_rules: ['Greet callers warmly.', 'Speak clearly and keep responses concise.'],
+      });
     }
 
     return await this.getAccount(id);
@@ -779,43 +854,23 @@ Address: Headquarters & Central Dispatch, Suite 100.
     return endpoints;
   }
 
-  // --- ASSISTANTS CRUD ---
+  // --- SINGLE ASSISTANT PER ACCOUNT ---
 
-  async listAssistants(accountId) {
-    const dir = path.join(this.baseDir, accountId, 'assistants');
+  async getAssistant(accountId) {
+    const file = path.join(this.baseDir, accountId, 'assistant.yaml');
     try {
-      await fs.mkdir(dir, { recursive: true });
-      const files = await fs.readdir(dir);
-      const yamlFiles = files.filter(f => f.endsWith('.yaml') || f.endsWith('.yml'));
-
-      const assistants = [];
-      for (const f of yamlFiles) {
-        try {
-          const raw = await fs.readFile(path.join(dir, f), 'utf8');
-          const data = yaml.parse(raw);
-          data.id = data.id || path.basename(f, path.extname(f));
-          assistants.push(data);
-        } catch (e) {}
-      }
-      return assistants;
+      const data = yaml.parse(await fs.readFile(file, 'utf8'));
+      return data ? { ...data, id: data.id || 'assistant' } : null;
     } catch (e) {
-      return [];
+      return null;
     }
   }
 
-  async getAssistant(accountId, assistantId) {
-    const file = path.join(this.baseDir, accountId, 'assistants', `${assistantId}.yaml`);
-    const raw = await fs.readFile(file, 'utf8');
-    return yaml.parse(raw);
-  }
-
   async saveAssistant(accountId, assistantData) {
-    const id = assistantData.id && assistantData.id.startsWith('asst-')
-      ? assistantData.id
-      : (assistantData.id || this.generateGuid('asst'));
-
-    const dir = path.join(this.baseDir, accountId, 'assistants');
-    await fs.mkdir(dir, { recursive: true });
+    const existing = await this.getAssistant(accountId);
+    const id = assistantData.id || existing?.id || 'assistant';
+    const accountDir = path.join(this.baseDir, accountId);
+    await fs.mkdir(accountDir, { recursive: true });
 
     const payload = {
       id,
@@ -824,29 +879,12 @@ Address: Headquarters & Central Dispatch, Suite 100.
       personality_style: assistantData.personality_style || 'Professional & Courteous',
       backstory: assistantData.backstory || '',
       conversational_rules: Array.isArray(assistantData.conversational_rules) ? assistantData.conversational_rules : [],
-      created_at: assistantData.created_at || new Date().toISOString(),
+      created_at: assistantData.created_at || existing?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    await fs.writeFile(path.join(dir, `${id}.yaml`), yaml.stringify(payload), 'utf8');
+    await fs.writeFile(path.join(accountDir, 'assistant.yaml'), yaml.stringify(payload), 'utf8');
     return payload;
-  }
-
-  async deleteAssistant(accountId, assistantId) {
-    const file = path.join(this.baseDir, accountId, 'assistants', `${assistantId}.yaml`);
-    const raw = await fs.readFile(file, 'utf8');
-    const data = yaml.parse(raw);
-
-    await this.addToRecycleBin(accountId, {
-      type: 'assistant',
-      id: assistantId,
-      name: data.name,
-      originalPath: `assistants/${assistantId}.yaml`,
-      data,
-    });
-
-    await fs.unlink(file);
-    return { success: true, movedToRecycleBin: true };
   }
 
   // --- RECYCLE BIN ---
@@ -903,11 +941,11 @@ Address: Headquarters & Central Dispatch, Suite 100.
 
   // --- PROMPT COMPILATION: STRICT 6-BLOCK SPECIFICATION ---
 
-  async compileAssistantPrompt(accountId, assistantId) {
+  async compileAssistantPrompt(accountId) {
     const account = await this.getAccount(accountId);
-    const assistant = await this.getAssistant(accountId, assistantId);
+    const assistant = await this.getAssistant(accountId);
     if (!account) throw new Error(`Account ${accountId} not found`);
-    if (!assistant) throw new Error(`Assistant ${assistantId} not found`);
+    if (!assistant) throw new Error(`Assistant for account ${accountId} not found`);
 
     // 1. Company Info Markdown
     const compInfo = await this.getCompanyInfo(accountId);
@@ -1212,8 +1250,8 @@ If a caller mentions acute chest pain, shortness of breath, severe head trauma, 
       });
     }
 
-    const assistants = await this.listAssistants(accountId);
-    if (assistants.length === 0) {
+    const assistant = await this.getAssistant(accountId);
+    if (!assistant || assistant.id === 'assistant') {
       await this.saveAssistant(accountId, {
         id: 'asst-sarah-lou',
         name: 'Sarah Lou Jenkins',
@@ -1223,17 +1261,6 @@ If a caller mentions acute chest pain, shortness of breath, severe head trauma, 
         conversational_rules: [
           'Greet callers warmly and listen actively.',
           'Speak with clarity, warmth, and respectful patience.',
-        ],
-      });
-      await this.saveAssistant(accountId, {
-        id: 'asst-dr-vance',
-        name: 'Dr. Robert Vance',
-        voice: 'Fenrir',
-        personality_style: 'Authoritative, Calm & Measured',
-        backstory: 'Senior clinical administrator ensuring protocol compliance and prompt triage.',
-        conversational_rules: [
-          'Maintain clinical decorum and clear diction.',
-          'Reassure anxious callers and guide them systematically.',
         ],
       });
     }

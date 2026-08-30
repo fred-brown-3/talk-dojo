@@ -25,10 +25,10 @@
       </div>
 
       <nav class="nav-links">
-        <!-- 1. 🏢 Account (Company Info) -->
+        <!-- 1. 🏢 Company Profile -->
         <button class="nav-item active" data-tab="account" data-sub="info" title="Company Info & Organization Profile">
           <span class="nav-icon">🏢</span>
-          <span class="nav-label">Account</span>
+          <span class="nav-label">Company Profile</span>
         </button>
 
         <!-- 2. 🛠️ Tools (Immediately under Account and above Policies) -->
@@ -97,19 +97,11 @@
           </div>
         </div>
 
-        <!-- 6. 🤖 Assistants -->
-        <div class="nav-tree-group" id="nav-group-assistants">
-          <button class="nav-item nav-tree-header" data-tab="assistants" data-sub="all" title="Virtual Assistants">
-            <span class="nav-icon">🤖</span>
-            <span class="nav-label">Assistants</span>
-            <span id="nav-badge-assistants" class="nav-count">0</span>
-            <span class="tree-arrow">▾</span>
-          </button>
-          <div class="nav-sub-tree">
-            <button class="nav-sub-item active" data-tab="assistants" data-sub="all">All Assistants</button>
-            <button class="nav-sub-item" data-tab="assistants" data-sub="new">+ New Assistant</button>
-          </div>
-        </div>
+        <!-- 6. 🤖 Assistant -->
+        <button class="nav-item" data-tab="assistant" data-sub="edit" title="Configure Assistant">
+          <span class="nav-icon">🤖</span>
+          <span class="nav-label">Assistant</span>
+        </button>
 
         <!-- 6. 🏆 Certification -->
         <div class="nav-tree-group" id="nav-group-certification">
@@ -127,8 +119,8 @@
       </nav>
 
       <div class="sidebar-footer">
-        <button id="btn-open-recycle-bin" class="btn-recycle-bin" title="Open Recycle Bin">
-          <span>🗑️</span> Recycle Bin <span id="recycle-bin-count" class="badge-mini">0</span>
+        <button id="btn-account-settings" class="btn-recycle-bin" data-tab="accountsettings" data-sub="overview" title="Account Settings">
+          <span>⚙️</span> Account Settings <span id="recycle-bin-count" class="badge-mini" title="Recycle bin items">0</span>
         </button>
       </div>
     </aside>
@@ -138,17 +130,11 @@
       <!-- Top Global Header -->
       <header class="dojo-top-header">
         <div class="header-left">
-          <div class="selector-capsule">
+          <button id="btn-header-account-switcher" class="selector-capsule account-switch-trigger" title="Switch account">
             <span class="capsule-label">Account:</span>
-            <select id="account-select" class="select-soft"></select>
-            <button id="btn-new-account" class="btn-icon-soft" title="Create New Account">+</button>
-          </div>
-
-          <div class="selector-capsule">
-            <span class="capsule-label">Assistant:</span>
-            <select id="assistant-select" class="select-soft"></select>
-            <button id="btn-new-assistant-top" class="btn-icon-soft" title="Create Assistant">+</button>
-          </div>
+            <strong id="header-account-name">Loading…</strong>
+            <span>⌄</span>
+          </button>
 
           <div id="active-deployment-badge" class="deployment-chip" title="Active Deployed Configuration">
             <span class="chip-dot"></span>
@@ -157,11 +143,7 @@
         </div>
 
         <div class="header-right">
-          <div class="api-key-soft">
-            <input type="password" id="api-key-input" placeholder="Gemini API Key..." spellcheck="false">
-            <button id="save-key-btn" class="btn-soft-xs">Save</button>
-            <span id="key-status-indicator" class="key-dot status-missing" title="API Key Required">●</span>
-          </div>
+          <span id="key-status-indicator" class="key-dot status-missing" title="API Key Required">●</span>
         </div>
       </header>
 
@@ -725,70 +707,42 @@
         </section>
 
         <!-- ============================================================ -->
-        <!-- TAB 6: 🤖 ASSISTANTS (MASTER-DETAIL + EMBEDDED CHAT)         -->
+        <!-- TAB 6: 🤖 ASSISTANT (DIRECT EDIT + EMBEDDED CHAT)           -->
         <!-- ============================================================ -->
-        <section id="pane-assistants" class="tab-pane">
+        <section id="pane-assistant" class="tab-pane">
           <div class="pane-header">
             <div>
-              <h2>🤖 Virtual Assistants Studio</h2>
-              <p class="text-muted text-xs">Configure phone personas, voice timbre models with 10-second audio previews, and test live in embedded chat.</p>
+              <h2>🤖 Assistant</h2>
+              <p class="text-muted text-xs">Configure this account's phone persona, voice timbre, conversational style, and live testing behavior.</p>
             </div>
-            <button id="btn-asst-nav-new" class="btn-primary-cyan">+ New Assistant</button>
           </div>
 
           <!-- Guidance Callout Banner -->
           <div class="guidance-banner">
             <span class="guidance-icon">💡</span>
             <div class="guidance-content">
-              <h4>How Assistant Personas & Voices Work</h4>
-              <p>Assistants combine an authentic backstory, voice timbre, and conversational manners with your organization's <strong>Policies</strong> and <strong>Procedures</strong>. Click <strong>"🔊 Preview Voice (10s)"</strong> to hear authentic native speech streamed from Gemini Live.</p>
+              <h4>Your Account Assistant</h4>
+              <p>Each account has exactly one assistant. Its persona and voice combine with the organization's <strong>Policies</strong> and <strong>Procedures</strong>. Click <strong>"🔊 Preview Voice (10s)"</strong> to hear its Gemini Live voice.</p>
             </div>
           </div>
 
-          <div class="master-detail-grid">
-            <!-- Left Master: Assistants List -->
-            <div class="master-col">
-              <div class="card p-3">
-                <div class="flex-between mb-3">
-                  <span class="text-xs font-bold text-dim">ASSISTANTS (<span id="assistants-total-count">0</span>)</span>
-                  <button id="btn-master-new-asst" class="btn-soft-xs">+ Add</button>
-                </div>
-                <div id="assistants-master-list" class="assistants-master-list"></div>
-              </div>
-            </div>
-
-            <!-- Right Detail: Assistant Form + Embedded Chat Window -->
-            <div class="detail-col">
-              <div id="assistants-zero-state" class="empty-card hidden">
-                <div class="empty-icon">🤖</div>
-                <h3>No assistants created, yet.</h3>
-                <p class="text-muted text-xs">Every organization requires at least one assistant to handle telephone calls.</p>
-                <button id="btn-empty-start-assistant" class="btn-primary-cyan mt-3">Click here to create your first assistant</button>
-              </div>
-
-              <div id="assistant-editor-card" class="card">
+          <div id="assistant-editor-card" class="card">
                 <div class="flex-between mb-3 border-b pb-2">
                   <div>
                     <h3 id="editor-heading">Configure Virtual Assistant</h3>
                     <span id="editor-subheading" class="text-xs text-muted">Edit persona, voice timbre, and tool access</span>
                   </div>
                   <div class="flex-center gap-2">
-                    <button id="btn-editor-delete-asst" class="btn-danger-soft">🗑️ Delete</button>
                     <button id="btn-editor-save-asst" class="btn-primary-cyan">Save Assistant</button>
                   </div>
                 </div>
 
-                <!-- AI Prompt box: ONLY visible when creating new -->
+                <!-- AI helper for quickly refining the single assistant persona -->
                 <div id="editor-ai-creator-box" class="card card-ai-prompt mb-3">
-                  <div class="flex-between mb-2">
-                    <span class="text-xs text-cyan font-bold">✨ Describe Your Perfect Assistant (Creation Only)</span>
-                    <div class="flex-center gap-2">
-                      <button id="btn-skip-ai-creator" class="btn-soft-xs">Skip to Manual</button>
-                    </div>
-                  </div>
+                  <span class="text-xs text-cyan font-bold block mb-2">✨ Refine This Assistant's Persona</span>
                   <div class="flex-gap-2">
-                    <input type="text" id="editor-describe-asst-input" class="input-soft flex-1" placeholder="e.g. A warm Southern receptionist named Clara who is polite, patient with seniors, and calm under pressure...">
-                    <button id="btn-ai-generate-asst" class="btn-primary-cyan">✨ Generate Persona</button>
+                    <input type="text" id="editor-describe-asst-input" class="input-soft flex-1" placeholder="e.g. Make the assistant warm, patient with seniors, and calm under pressure...">
+                    <button id="btn-ai-generate-asst" class="btn-primary-cyan">✨ Refine Persona</button>
                   </div>
                 </div>
 
@@ -902,8 +856,6 @@
                   <!-- Hidden audio player for assistant speech output -->
                   <audio id="chat-audio-player" class="hidden"></audio>
                 </div>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -953,8 +905,8 @@
               <h3 class="mb-2">Certification Setup</h3>
               <div class="form-grid-2">
                 <div class="form-group">
-                  <label for="cert-target-assistant">Assistant to Certify</label>
-                  <select id="cert-target-assistant" class="select-soft"></select>
+                  <label>Assistant</label>
+                  <div id="cert-assistant-summary" class="readonly-field">Loading account assistant…</div>
                 </div>
                 <div class="form-group">
                   <label>Execution Mode</label>
@@ -966,7 +918,7 @@
               </div>
 
               <div class="flex-between mt-2">
-                <span class="text-xs text-muted">Certifies against all enabled test bank scenarios.</span>
+                <span class="text-xs text-muted">Certifies this account's assistant against all enabled test scenarios.</span>
                 <button id="btn-snapshot-certify" class="btn-primary-cyan">
                   🚀 Launch Snapshot & Certify
                 </button>
@@ -1029,7 +981,62 @@
           </div>
         </section>
 
+        <!-- ============================================================ -->
+        <!-- ACCOUNT SETTINGS                                            -->
+        <!-- ============================================================ -->
+        <section id="pane-accountsettings" class="tab-pane">
+          <div class="pane-header">
+            <div>
+              <h2>⚙️ Account Settings</h2>
+              <p class="text-muted text-xs">Switch organizations, manage application access, and review recoverable account items.</p>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <div class="card p-3">
+              <div class="settings-card-icon">🏢</div>
+              <h3>Current Account</h3>
+              <p id="settings-current-account-name" class="text-muted mb-3">Loading…</p>
+              <button id="btn-open-account-switcher" class="btn-primary-cyan">Switch Accounts</button>
+            </div>
+
+            <div class="card p-3">
+              <div class="settings-card-icon">🔑</div>
+              <h3>API Configuration</h3>
+              <p class="text-muted text-xs mb-2">The Gemini API key applies to this Talk Dojo installation.</p>
+              <div class="flex-gap-2">
+                <input type="password" id="api-key-input" class="input-soft flex-1" placeholder="Gemini API Key..." spellcheck="false">
+                <button id="save-key-btn" class="btn-primary-cyan">Save Key</button>
+              </div>
+            </div>
+
+            <div class="card p-3">
+              <div class="settings-card-icon">🗑️</div>
+              <h3>Recycle Bin</h3>
+              <p class="text-muted text-xs mb-3">Restore soft-deleted tools, policies, procedures, and test scenarios.</p>
+              <button id="btn-open-recycle-bin" class="btn-soft-xs">Open Recycle Bin</button>
+            </div>
+          </div>
+        </section>
+
       </main>
+    </div>
+  </div>
+
+  <!-- Account Switcher Modal -->
+  <div id="account-switcher-modal" class="drawer-overlay hidden">
+    <div class="drawer-panel account-switcher-panel">
+      <div class="drawer-header">
+        <div>
+          <h3>Switch Account</h3>
+          <p class="text-xs text-muted">Choose an organization or create a new account.</p>
+        </div>
+        <button id="btn-close-account-switcher" class="btn-icon-soft">✕</button>
+      </div>
+      <div id="account-switcher-list" class="account-card-grid"></div>
+      <div class="drawer-footer">
+        <button id="btn-new-account" class="btn-primary-cyan">+ New Account</button>
+      </div>
     </div>
   </div>
 

@@ -16,7 +16,7 @@ The platform enables companies to define:
 3. **Policies**: Operational directives and compliance guardrails (`POL-xxx`: `always`, `never`, `conditional`).
 4. **Procedures**: Step-by-step workflow directives (`PROC-xxx`) with granular tool action authorizations.
 5. **Test Scenarios**: Multi-target customer roleplays (`TEST-xxx`) linked to policies and procedures.
-6. **Virtual Assistants**: Personas, voice models (Aoede, Fenrir, etc.), and conversational manners.
+6. **Assistant**: One persona per account with a voice model (Aoede, Fenrir, etc.) and conversational manners.
 7. **Certification**: Automated or simulated dialog evaluation across test scenarios with scoring and audio playback.
 
 ---
@@ -46,11 +46,11 @@ The platform enables companies to define:
   2. **Top Coverage Gap Alert Card**: `#testscenarios-gap-banner` appears on the Test Scenarios tab displaying uncovered items and a `⚡ Create Draft Tests` button.
   3. **Inline Warnings**: `#policy-uncovered-warning` and `#proc-uncovered-warning` appear directly inside the edit cards of individual policies and procedures when they lack tests, with a `⚡ Generate Test Scenario` quick action.
 
-### C. Decoupled Tool Assignments from Assistants
-- Assistants no longer hold an allowed tools list.
+### C. Decoupled Tool Assignments from the Assistant
+- The assistant no longer holds an allowed tools list.
 - Tools are defined at the Account level under Tools, and granular actions are authorized on Procedures.
 - The prompt compiler automatically grants tool authorization to any action associated with active procedures.
-- Removed the "Assigned Tools" checkboxes section from the Assistant editor UI and payloads.
+- Removed the "Assigned Tools" checkboxes section from the Assistant editor UI and payload.
 
 ### D. Granular Tool Actions in Procedures
 - Procedures authorize specific endpoints/actions (e.g. `check_clinic_slots` vs `book_clinic_appointment`), not just entire services.
@@ -66,19 +66,19 @@ Pre-populated in `AccountManager.initDefaultSeedAccounts()`:
    - Tools: Clinic Scheduling & EHR Service
    - Policies: HIPAA verification, medical-advice prohibition, emergency triage, and hardship assistance (`POL-001`–`POL-004`)
    - Procedures: Schedule Clinic Appointment (`PROC-001`), Prescription Refill Request (`PROC-002`)
-   - Assistants: Sarah Lou Jenkins (Aoede timbre, warm Southern hospitality)
+   - Assistant: Sarah Lou Jenkins (Aoede timbre, warm Southern hospitality)
    - Tests: `TEST-001`, `TEST-002`
 2. **Law Firm**: `Sterling & Sterling LLP — Civil Litigation & Corporate Law` (`acct-law-sterling`)
    - Tools: Legal Intake CRM & Conflict Engine
    - Policies: Disclaimer, conflict clearance, outcome-quote prohibition, and urgent intake (`POL-001`–`POL-004`)
    - Procedures: Prospective Client Intake (`PROC-001`), Partner Consultation Scheduling (`PROC-002`)
-   - Assistants: Eleanor Vance (Kore timbre)
+   - Assistant: Eleanor Vance (Kore timbre)
    - Tests: `TEST-001`
 3. **Real Estate Firm**: `Vanguard Realty Group & Property Management` (`acct-real-vanguard`)
    - Tools: MLS Property & Showing Dispatch
    - Policies: Fair housing, brokerage disclosure, and seller-price confidentiality (`POL-001`–`POL-003`)
    - Procedures: Property Showing Tour Request (`PROC-001`), Listing Consultation Dispatch (`PROC-002`)
-   - Assistants: Chloe Bennett (Puck timbre)
+   - Assistant: Chloe Bennett (Puck timbre)
    - Tests: `TEST-001`
 
 ---
@@ -108,5 +108,17 @@ Completed on 2026-08-30:
 5. Removed obsolete test-bank routes and updated remediation to use top-level scenario and policy stores.
 6. Hardened `TEST-xxx` allocation against overwriting a higher existing ID after deletions.
 7. Added regression coverage for standalone scenarios, coverage gaps, runtime action mapping, and private customer instructions.
+
+## 5. Single-Assistant & Account Settings Simplification
+
+Completed on 2026-08-30:
+
+1. Enforced exactly one `assistant.yaml` per account and removed plural assistant collection storage.
+2. Added destructive startup migration that retains one canonical assistant, removes legacy assistant files, and removes assistant recycle-bin artifacts.
+3. Changed the UI navigation from **Assistants** to a direct singular **Assistant** editor with no list, selector, create, or delete controls.
+4. Removed the account and assistant selectors plus API-key input from the top header.
+5. Added bottom **Account Settings** navigation with account switching, API configuration, and Recycle Bin access.
+6. Added a card-based account-switching modal with account context and new-account creation.
+7. Simplified certification so it automatically uses the account assistant and only asks for execution mode.
 
 Automated and browser verification results should be recorded with the completing commit.

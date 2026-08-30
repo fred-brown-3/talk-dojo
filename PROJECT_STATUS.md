@@ -15,7 +15,7 @@
 3. Establish immutable compliance policies (`POL-xxx`) classified as **Always**, **Never**, or **Conditional**.
 4. Define authorized procedures (`PROC-xxx`) that constrain tool usage at the endpoint/action level.
 5. Author standalone test scenarios (`TEST-xxx`) linked to multiple policies and procedures with proactive coverage-gap detection.
-6. Build virtual phone assistants with distinct personas, authentic backstories, conversational guidelines, and Gemini Multimodal Live voice timbres (`Aoede`, `Fenrir`, `Charon`, `Kore`, `Puck`) with static-free 10-second audio previews.
+6. Configure one virtual phone assistant per account with an authentic backstory, conversational guidelines, and Gemini Multimodal Live voice timbre (`Aoede`, `Fenrir`, `Charon`, `Kore`, or `Puck`).
 7. Spar live with the assistant inside an embedded voice-first call window where the actual LLM streams native spoken audio.
 8. Certify assistants against all enabled standalone scenarios in either ultra-fast Text mode or high-fidelity Voice telephony mode, streaming turns live with interactive **Pause**, **Continue**, and **Restart** controls.
 9. Create immutable configuration snapshots and manage active production deployments with safety audit logs.
@@ -24,15 +24,16 @@
 
 ## 2. Navigation Hierarchy & Route Structure
 
-The UI follows an intentional 7-tier sequential hierarchy:
+The UI follows an intentional 8-tier sequential hierarchy:
 ```
 1. 🏢 Account              -> /#/account/:accountId/info
 2. 🛠️ Tools                -> /#/account/:accountId/tools/all?id=<toolId>  |  /#/account/:accountId/tools/new
 3. 📜 Policies             -> /#/account/:accountId/policies/all_enabled?id=<policyId>
 4. 📋 Procedures           -> /#/account/:accountId/procedures/all_enabled?id=<procId>
 5. 🏦 Test Scenarios       -> /#/account/:accountId/testscenarios/all?id=<testId>
-6. 🤖 Assistants           -> /#/account/:accountId/assistants/all?id=<asstId>  |  /#/account/:accountId/assistants/new
+6. 🤖 Assistant            -> /#/account/:accountId/assistant/edit
 7. 🏆 Certification        -> /#/account/:accountId/certification/history  |  /#/account/:accountId/certification/new
+8. ⚙️ Account Settings     -> /#/account/:accountId/accountsettings/overview
 ```
 
 ### Hash-Based Deep Linking Convention
@@ -75,8 +76,9 @@ The UI follows an intentional 7-tier sequential hierarchy:
 - Coverage warnings flag enabled policies and procedures not referenced by any enabled scenario.
 - Certification maps linked procedure actions into an isolated assistant toolbelt.
 
-### F. Assistants Studio (`data/accounts/<account-id>/assistants/`)
-- Master-detail view for managing multiple phone personas.
+### F. Account Assistant (`data/accounts/<account-id>/assistant.yaml`)
+- Exactly one assistant is permitted per account and opens directly in a singular editor.
+- Legacy `assistants/` directories are migrated destructively; one canonical record is retained and no assistant backup/recycle artifact is created.
 - **Voice Timbre Clarity & Gemini Live Bidi Previews**:
   - `Aoede`: Female timbre · Warm, breezy & natural (~240 Hz).
   - `Fenrir`: Male timbre · Deep, resonant & authoritative (~110 Hz).
@@ -126,7 +128,7 @@ When compiling the system prompt for an assistant (`compileAssistantPrompt`), it
 | `POST` | `/api/accounts/:id/test-scenarios/suggest-links` | Suggest policy and procedure links |
 | `GET/POST` | `/api/accounts/:id/virtual-tools` | List/Save normalized MCP tool endpoints |
 | `POST` | `/api/accounts/:id/virtual-tools/describe` | AI tool generation endpoint |
-| `GET/POST` | `/api/accounts/:id/assistants` | List/Save virtual assistants |
+| `GET/POST` | `/api/accounts/:id/assistant` | Get or save the account's sole assistant |
 | `GET` | `/api/voice-preview/:voiceName` | Spoken preview WAV from Gemini Live cache |
 | `POST` | `/api/chat/assistant-turn` | Single turn (returns text + native audioBase64) |
 | `POST` | `/api/chat/review-interaction` | AI referee interaction scoring |
@@ -145,3 +147,4 @@ When compiling the system prompt for an assistant (`compileAssistantPrompt`), it
 3. **Strict Procedures Enforcement**: Assistants must only execute workflows and tools defined in enabled procedures; unmapped requests must be politely declined.
 4. **Auto-Growing Textareas**: Any multi-line input must use the `.auto-grow` class so that text content expands dynamically without internal scrollbars.
 5. **Maintain All Test Suites**: Before ending your turn, always verify with `npm test`. All test suites must pass without regressions.
+6. **Singleton Assistant Invariant**: Never reintroduce assistant lists, assistant selectors, plural assistant storage, or assistant deletion.

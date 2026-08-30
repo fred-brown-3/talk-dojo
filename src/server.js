@@ -345,41 +345,24 @@ app.post('/api/accounts/:id/test-scenarios/suggest-links', async (req, res) => {
   }
 });
 
-// --- ASSISTANTS API ---
+// --- SINGLE ASSISTANT API ---
 
-app.get('/api/accounts/:id/assistants', async (req, res) => {
+app.get('/api/accounts/:id/assistant', async (req, res) => {
   try {
-    const assistants = await accountManager.listAssistants(req.params.id);
-    res.json(assistants);
+    const assistant = await accountManager.getAssistant(req.params.id);
+    if (!assistant) return res.status(404).json({ error: 'Assistant not found' });
+    res.json(assistant);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/accounts/:id/assistants/:assistantId', async (req, res) => {
-  try {
-    const assistant = await accountManager.getAssistant(req.params.id, req.params.assistantId);
-    res.json(assistant);
-  } catch (err) {
-    res.status(404).json({ error: 'Assistant not found' });
-  }
-});
-
-app.post('/api/accounts/:id/assistants', async (req, res) => {
+app.post('/api/accounts/:id/assistant', async (req, res) => {
   try {
     const assistant = await accountManager.saveAssistant(req.params.id, req.body);
     res.json(assistant);
   } catch (err) {
     res.status(400).json({ error: err.message });
-  }
-});
-
-app.delete('/api/accounts/:id/assistants/:assistantId', async (req, res) => {
-  try {
-    const result = await accountManager.deleteAssistant(req.params.id, req.params.assistantId);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 });
 
@@ -485,7 +468,7 @@ app.post('/api/accounts/:id/describe-business', async (req, res) => {
 });
 
 // "Describe your perfect assistant..." AI Generator
-app.post('/api/accounts/:id/assistants/describe', async (req, res) => {
+app.post('/api/accounts/:id/assistant/describe', async (req, res) => {
   try {
     const { prompt } = req.body;
     const generated = await accountManager.generateAssistantFromDescription(prompt, runtimeApiKey);
@@ -548,11 +531,12 @@ app.post('/api/accounts/:id/virtual-tools/describe', async (req, res) => {
 
 app.post('/api/accounts/:id/certification/certify', async (req, res) => {
   try {
-    const { assistantId, bankId = 'default-bank', mode = 'text' } = req.body;
+    const { bankId = 'default-bank', mode = 'text' } = req.body;
+    const assistant = await accountManager.getAssistant(req.params.id);
+    if (!assistant) return res.status(400).json({ error: 'Configure the account assistant before certification.' });
     // Run async certification
     certificationManager.snapshotAndCertify({
       accountId: req.params.id,
-      assistantId,
       bankId,
       mode,
       onProgress: (evt) => broadcast({ type: 'certification_progress', ...evt }),
@@ -634,12 +618,12 @@ app.post('/api/accounts/:id/certification/abort', (req, res) => {
 
 app.post('/api/chat/assistant-turn', async (req, res) => {
   try {
-    const { accountId, assistantId, message, history = [], modality = 'text', scenarioContext = '' } = req.body;
+    const { accountId, message, history = [], modality = 'text', scenarioContext = '' } = req.body;
     const account = await accountManager.getAccount(accountId);
-    const assistant = await accountManager.getAssistant(accountId, assistantId);
+    const assistant = await accountManager.getAssistant(accountId);
     if (!account || !assistant) return res.status(404).json({ error: 'Account or Assistant not found' });
 
-    const assistantPrompt = await accountManager.compileAssistantPrompt(accountId, assistantId);
+    const assistantPrompt = await accountManager.compileAssistantPrompt(accountId);
     const systemInstruction = `${assistantPrompt}\n\n=== CALL SCENARIO CONTEXT ===\n${scenarioContext || 'The customer has called your telephone line.'}\nRespond strictly in spoken conversational character as ${assistant.name}. Keep phone responses concise, natural, and friendly.`;
 
     if (!runtimeApiKey) {
@@ -714,7 +698,7 @@ app.post('/api/chat/assistant-turn', async (req, res) => {
 
 app.post('/api/chat/review-interaction', async (req, res) => {
   try {
-    const { scenario, transcript, assistantId } = req.body;
+    const { scenario, transcript } = req.body;
     const evaluation = await llmJudge.evaluateConversation({
       scenario: scenario || { title: 'Freeform Interaction', evaluation_checklist: [] },
       transcript: transcript || [],
@@ -797,11 +781,13 @@ app.delete('/api/accounts/:id/recycle-bin', async (req, res) => {
 
 app.post('/api/accounts/:id/batch-run', async (req, res) => {
   try {
-    const { assistantId, bankId = 'default-bank', mode = 'text', maxTurns = 6 } = req.body;
+    const { bankId = 'default-bank', mode = 'text', maxTurns = 6 } = req.body;
+    const assistant = await accountManager.getAssistant(req.params.id);
+    if (!assistant) return res.status(400).json({ error: 'Configure the account assistant before running tests.' });
     // Launch async batch run so request returns immediately with runner status
     batchRunner.runBatch({
       accountId: req.params.id,
-      assistantId,
+      assistantId: assistant.id,
       bankId,
       mode,
       maxTurns,

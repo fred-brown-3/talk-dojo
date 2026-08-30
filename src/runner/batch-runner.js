@@ -248,7 +248,7 @@ export class BatchRunner extends EventEmitter {
    */
   async runTextTest({ accountId, assistantId, test, maxTurns = 6 }) {
     test = await this.prepareRuntimeTest(accountId, test);
-    const assistantPrompt = await this.accountManager.compileAssistantPrompt(accountId, assistantId, test);
+    const assistantPrompt = await this.accountManager.compileAssistantPrompt(accountId);
     const assistant = await this.accountManager.getAssistant(accountId, assistantId);
 
     // Isolated Tool Executors
@@ -438,7 +438,7 @@ Generate your next spoken response to the other person.
    */
   async runVoiceTest({ accountId, assistantId, test, maxTurns = 6 }) {
     test = await this.prepareRuntimeTest(accountId, test);
-    const assistantPrompt = await this.accountManager.compileAssistantPrompt(accountId, assistantId, test);
+    const assistantPrompt = await this.accountManager.compileAssistantPrompt(accountId);
     const assistant = await this.accountManager.getAssistant(accountId, assistantId);
 
     // Merge compiled prompt into caller specification

@@ -843,6 +843,70 @@ select option {
 }
 .hidden { display: none !important; }
 
+.account-switch-trigger {
+  color: var(--text-main);
+  cursor: pointer;
+  gap: 8px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.settings-card-icon {
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.readonly-field {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.025);
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.account-switcher-panel {
+  max-width: 760px;
+}
+
+.account-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.account-switch-card {
+  text-align: left;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.025);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.account-switch-card:hover,
+.account-switch-card.active {
+  border-color: var(--cyan);
+  background: rgba(0,210,255,0.07);
+  transform: translateY(-1px);
+}
+
+.account-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
 /* Guidance Callout Banners */
 .guidance-banner {
   background: linear-gradient(135deg, rgba(0, 210, 255, 0.06), rgba(168, 85, 247, 0.04));
@@ -1265,5 +1329,4 @@ select option {
   border-color: var(--cyan);
   color: #fff;
 }
-
 

@@ -238,11 +238,10 @@ async function runTests() {
   console.log(`   Procedures Confirmed: [${proc1.id}] ${proc1.name} (${proc1.test_scenarios.length} test scenario)`);
 
   // Test Assistant retrieval & 6-Block prompt compilation
-  const assistants = await testAccountManager.listAssistants(accountId);
-  assert(assistants.length >= 1, 'Expected at least 1 assistant');
-  const asst = assistants[0];
+  const asst = await testAccountManager.getAssistant(accountId);
+  assert(asst, 'Expected exactly one account assistant');
 
-  const compiledPrompt = await testAccountManager.compileAssistantPrompt(accountId, asst.id);
+  const compiledPrompt = await testAccountManager.compileAssistantPrompt(accountId);
   assert(compiledPrompt.includes('=== BLOCK 1: BUSINESS CONTEXT & COMPANY INFORMATION ==='), 'Expected Block 1');
   assert(compiledPrompt.includes('=== BLOCK 2: IMMUTABLE POLICIES & COMPLIANCE RULES ==='), 'Expected Block 2');
   assert(compiledPrompt.includes('=== BLOCK 3: AUTHORIZED PROCEDURES & WORKFLOW CONSTRAINTS ==='), 'Expected Block 3');
@@ -330,6 +329,38 @@ async function runTests() {
   const authorizedNames = targetProcedure.authorized_actions || targetProcedure.authorized_tools || [];
   assert(runtimeTest.caller.tools.every(tool => authorizedNames.includes(tool.name)), 'Runtime toolbelt must be limited to linked procedure actions');
   console.log(`   Standalone Scenarios Confirmed (${runtimeTest.caller.tools.length} authorized runtime actions)`);
+
+  // Test destructive migration from plural assistant files to the singleton schema
+  console.log('Testing One-Assistant-Per-Account Schema Migration...');
+  const singletonRoot = path.resolve(process.cwd(), 'data/test-single-assistant');
+  await fs.rm(singletonRoot, { recursive: true, force: true });
+  const legacyAccountDir = path.join(singletonRoot, 'acct-singleton-check');
+  await fs.mkdir(path.join(legacyAccountDir, 'assistants'), { recursive: true });
+  await fs.mkdir(path.join(legacyAccountDir, 'recycle-bin'), { recursive: true });
+  await fs.writeFile(path.join(legacyAccountDir, 'account.yaml'), 'id: acct-singleton-check\nname: Singleton Check\n');
+  await fs.writeFile(path.join(legacyAccountDir, 'company_info.md'), '## Overview\nSingleton check account.\n');
+  await fs.writeFile(path.join(legacyAccountDir, 'assistants', 'asst-other.yaml'), 'id: asst-other\nname: Other Assistant\nvoice: Fenrir\n');
+  await fs.writeFile(path.join(legacyAccountDir, 'assistants', 'asst-sarah-lou.yaml'), 'id: asst-sarah-lou\nname: Sarah Lou Jenkins\nvoice: Aoede\n');
+  await fs.writeFile(path.join(legacyAccountDir, 'recycle-bin', 'items.json'), JSON.stringify([
+    { binItemId: 'old-assistant', type: 'assistant', id: 'asst-deleted' },
+    { binItemId: 'kept-policy', type: 'policy', id: 'POL-001' },
+  ]));
+
+  const singletonManager = new AccountManager('data/test-single-assistant');
+  await singletonManager.init();
+  const migratedAssistant = await singletonManager.getAssistant('acct-singleton-check');
+  assert.strictEqual(migratedAssistant.name, 'Sarah Lou Jenkins', 'Migration should retain the canonical assistant');
+  await assert.rejects(fs.access(path.join(legacyAccountDir, 'assistants')), 'Plural assistant directory must be permanently removed');
+  const migratedBin = JSON.parse(await fs.readFile(path.join(legacyAccountDir, 'recycle-bin', 'items.json'), 'utf8'));
+  assert(!migratedBin.some(item => item.type === 'assistant'), 'Assistant recycle-bin artifacts must be removed');
+  await singletonManager.saveAssistant('acct-singleton-check', { id: 'replacement-id', name: 'Replacement Assistant', voice: 'Kore' });
+  const replacementAssistant = await singletonManager.getAssistant('acct-singleton-check');
+  assert.strictEqual(replacementAssistant.name, 'Replacement Assistant');
+  assert.strictEqual((await fs.readdir(legacyAccountDir)).filter(file => /^assistant\.ya?ml$/.test(file)).length, 1, 'Exactly one assistant file may exist');
+
+  const newSingletonAccount = await singletonManager.saveAccount({ name: 'Fresh Singleton Account' });
+  assert(await singletonManager.getAssistant(newSingletonAccount.id), 'New accounts must receive a default assistant');
+  console.log('   Singleton Assistant Schema Confirmed');
 
   // Test CertificationManager Snapshots with Policies & Procedures Freeze
   const { CertificationManager } = await import('../src/certification/certification-manager.js');

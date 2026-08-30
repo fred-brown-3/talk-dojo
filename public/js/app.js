@@ -32,7 +32,8 @@ class TalkDojoEnterpriseApp {
     this.activeTestLinkedPolicies = [];
     this.activeTestLinkedProcedures = [];
     this.virtualTools = [];
-    this.assistants = [];
+    this.assistant = null;
+    this.accounts = [];
     this.companySections = [];
     this.rawMarkdownMode = false;
 
@@ -74,14 +75,13 @@ class TalkDojoEnterpriseApp {
       navBadgeTestScenarios: document.getElementById('nav-badge-testscenarios'),
       navBadgeTestDrafts: document.getElementById('nav-badge-test-drafts'),
       navBadgeGapsCount: document.getElementById('nav-badge-gaps-count'),
-      navBadgeAssistants: document.getElementById('nav-badge-assistants'),
       navBadgeCert: document.getElementById('nav-badge-cert'),
 
       // Top Header
-      accountSelect: document.getElementById('account-select'),
-      assistantSelect: document.getElementById('assistant-select'),
+      headerAccountName: document.getElementById('header-account-name'),
+      btnHeaderAccountSwitcher: document.getElementById('btn-header-account-switcher'),
+      btnAccountSettings: document.getElementById('btn-account-settings'),
       btnNewAccount: document.getElementById('btn-new-account'),
-      btnNewAssistantTop: document.getElementById('btn-new-assistant-top'),
       activeDeploymentBadge: document.getElementById('active-deployment-badge'),
       activeDeployText: document.getElementById('active-deploy-text'),
       apiKeyInput: document.getElementById('api-key-input'),
@@ -213,20 +213,12 @@ class TalkDojoEnterpriseApp {
       btnTestAddCriteria: document.getElementById('btn-test-add-criteria'),
       testCriteriaList: document.getElementById('test-criteria-list'),
 
-      // Tab 6: Assistants (Master-Detail + Embedded Chat)
-      btnAsstNavNew: document.getElementById('btn-asst-nav-new'),
-      assistantsTotalCount: document.getElementById('assistants-total-count'),
-      btnMasterNewAsst: document.getElementById('btn-master-new-asst'),
-      assistantsMasterList: document.getElementById('assistants-master-list'),
-      assistantsZeroState: document.getElementById('assistants-zero-state'),
-      btnEmptyStartAssistant: document.getElementById('btn-empty-start-assistant'),
+      // Tab 6: Single Assistant + Embedded Chat
       assistantEditorCard: document.getElementById('assistant-editor-card'),
       editorHeading: document.getElementById('editor-heading'),
       editorSubheading: document.getElementById('editor-subheading'),
-      btnEditorDeleteAsst: document.getElementById('btn-editor-delete-asst'),
       btnEditorSaveAsst: document.getElementById('btn-editor-save-asst'),
       editorAiCreatorBox: document.getElementById('editor-ai-creator-box'),
-      btnSkipAiCreator: document.getElementById('btn-skip-ai-creator'),
       editorDescribeAsstInput: document.getElementById('editor-describe-asst-input'),
       btnAiGenerateAsst: document.getElementById('btn-ai-generate-asst'),
       asstNameInput: document.getElementById('asst-name-input'),
@@ -267,7 +259,7 @@ class TalkDojoEnterpriseApp {
       btnRefreshSnapshots: document.getElementById('btn-refresh-snapshots'),
       snapshotsHistoryList: document.getElementById('snapshots-history-list'),
       certParamsCard: document.getElementById('cert-params-card'),
-      certTargetAssistant: document.getElementById('cert-target-assistant'),
+      certAssistantSummary: document.getElementById('cert-assistant-summary'),
       btnCertModeText: document.getElementById('btn-cert-mode-text'),
       btnCertModeVoice: document.getElementById('btn-cert-mode-voice'),
       btnSnapshotCertify: document.getElementById('btn-snapshot-certify'),
@@ -292,6 +284,13 @@ class TalkDojoEnterpriseApp {
       certScrubberFill: document.getElementById('cert-scrubber-fill'),
       certAudioEl: document.getElementById('cert-audio-el'),
       certDetailTranscript: document.getElementById('cert-detail-transcript'),
+
+      // Account Settings & Switcher
+      settingsCurrentAccountName: document.getElementById('settings-current-account-name'),
+      btnOpenAccountSwitcher: document.getElementById('btn-open-account-switcher'),
+      accountSwitcherModal: document.getElementById('account-switcher-modal'),
+      btnCloseAccountSwitcher: document.getElementById('btn-close-account-switcher'),
+      accountSwitcherList: document.getElementById('account-switcher-list'),
 
       // Recycle Bin Drawer
       recycleBinDrawer: document.getElementById('recycle-bin-drawer'),
@@ -350,7 +349,8 @@ class TalkDojoEnterpriseApp {
   }
 
   normalizeTabId(tab = 'account') {
-    return tab.replace(/-/g, '').toLowerCase();
+    const normalized = tab.replace(/-/g, '').toLowerCase();
+    return normalized === 'assistants' ? 'assistant' : normalized;
   }
 
   parseHashRoute() {
@@ -391,12 +391,8 @@ class TalkDojoEnterpriseApp {
   async applyHashRoute() {
     const { accountId, tab, sub, id } = this.parseHashRoute();
 
-    if (accountId && accountId !== this.activeAccountId && this.el.accountSelect) {
-      const opt = Array.from(this.el.accountSelect.options).find(o => o.value === accountId);
-      if (opt) {
-        this.el.accountSelect.value = accountId;
-        await this.selectAccount(accountId);
-      }
+    if (accountId && accountId !== this.activeAccountId && this.accounts.some(account => account.id === accountId)) {
+      await this.selectAccount(accountId);
     }
 
     this.switchTab(tab, sub, id, false);
@@ -437,19 +433,12 @@ class TalkDojoEnterpriseApp {
       });
     });
 
-    // Top Header Selectors
-    this.el.accountSelect.addEventListener('change', async () => {
-      await this.selectAccount(this.el.accountSelect.value);
-      this.navigate(this.activeTab, this.activeSub);
-    });
-
-    this.el.assistantSelect.addEventListener('change', () => {
-      this.selectAssistant(this.el.assistantSelect.value);
-    });
-
+    // Account Settings & Header
+    this.el.btnHeaderAccountSwitcher.addEventListener('click', () => this.openAccountSwitcher());
+    this.el.btnAccountSettings.addEventListener('click', () => this.navigate('accountsettings', 'overview'));
+    this.el.btnOpenAccountSwitcher.addEventListener('click', () => this.openAccountSwitcher());
+    this.el.btnCloseAccountSwitcher.addEventListener('click', () => this.closeAccountSwitcher());
     this.el.btnNewAccount.addEventListener('click', () => this.createNewAccountModal());
-    this.el.btnNewAssistantTop.addEventListener('click', () => this.navigate('assistants', 'new'));
-
     this.el.saveKeyBtn.addEventListener('click', () => this.saveApiKey());
 
     // Tab 1: Account (Company Info)
@@ -541,14 +530,9 @@ class TalkDojoEnterpriseApp {
     if (this.el.btnTestAddLinkPicker) this.el.btnTestAddLinkPicker.addEventListener('click', () => this.openAddLinkPickerModal());
     if (this.el.btnTestAddCriteria) this.el.btnTestAddCriteria.addEventListener('click', () => this.addTestCriteriaRow());
 
-    // Tab 6: Assistants
-    this.el.btnAsstNavNew.addEventListener('click', () => this.navigate('assistants', 'new'));
-    this.el.btnMasterNewAsst.addEventListener('click', () => this.navigate('assistants', 'new'));
-    this.el.btnEmptyStartAssistant.addEventListener('click', () => this.navigate('assistants', 'new'));
-    this.el.btnSkipAiCreator.addEventListener('click', () => this.el.asstNameInput.focus());
+    // Tab 6: Assistant
     this.el.btnAiGenerateAsst.addEventListener('click', () => this.runAiDescribeAssistant());
     this.el.btnEditorSaveAsst.addEventListener('click', () => this.saveCurrentAssistant());
-    this.el.btnEditorDeleteAsst.addEventListener('click', () => this.deleteCurrentAssistant());
     this.el.btnAsstAddRule.addEventListener('click', () => this.addAssistantRuleRow());
     this.el.btnPreviewVoice.addEventListener('click', () => this.playVoicePreview());
 
@@ -607,6 +591,7 @@ class TalkDojoEnterpriseApp {
     tabId = this.normalizeTabId(tabId);
     this.activeTab = tabId;
     this.activeSub = sub;
+    this.el.btnAccountSettings.classList.toggle('active', tabId === 'accountsettings');
 
     // Update nav active states
     this.el.navItems.forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
@@ -661,9 +646,8 @@ class TalkDojoEnterpriseApp {
         this.loadTestScenarios(this.activeAccountId, this.testFilter, id);
       }
     }
-    if (tabId === 'assistants') {
-      const isNew = sub === 'new';
-      this.loadAssistantsMasterDetail(isNew, id);
+    if (tabId === 'assistant') {
+      this.loadAssistant(this.activeAccountId);
     }
     if (tabId === 'certification') {
       const isNew = sub === 'new';
@@ -671,6 +655,9 @@ class TalkDojoEnterpriseApp {
       this.el.certSubviewNew.classList.toggle('hidden', !isNew);
       if (isNew) this.renderCertTestsList();
       else this.loadCertificationHistory();
+    }
+    if (tabId === 'accountsettings') {
+      this.renderAccountSettings();
     }
 
     if (updateHash) {
@@ -685,8 +672,9 @@ class TalkDojoEnterpriseApp {
     try {
       const res = await fetch('/api/accounts');
       const accounts = await res.json();
-      this.el.accountSelect.innerHTML = accounts.map(a => `<option value="${a.id}">${a.name} (${a.id})</option>`).join('');
-      if (accounts.length > 0) {
+      this.accounts = accounts || [];
+      this.renderAccountSwitcher();
+      if (accounts.length > 0 && !this.activeAccountId) {
         await this.selectAccount(accounts[0].id);
       }
     } catch (e) {
@@ -701,6 +689,8 @@ class TalkDojoEnterpriseApp {
       const acc = await res.json();
       if (!acc) return;
 
+      this.el.headerAccountName.textContent = acc.name || 'Account';
+      this.el.settingsCurrentAccountName.textContent = `${acc.name || 'Account'} · ${acc.id}`;
       this.el.accName.value = acc.name || '';
       await this.loadCompanyInfo(accountId);
       await this.loadVirtualTools();
@@ -708,9 +698,10 @@ class TalkDojoEnterpriseApp {
       await this.loadProcedures(accountId, this.procFilter);
       await this.loadTestScenarios(accountId, this.testFilter);
       await this.loadCoverageGaps(accountId);
-      await this.loadAssistants(accountId);
+      await this.loadAssistant(accountId);
       await this.refreshRecycleBinCount();
       await this.loadActiveDeploymentBadge();
+      this.renderAccountSwitcher();
       this.adjustAllAutoGrow();
     } catch (e) {
       console.error('Error selecting account:', e);
@@ -829,8 +820,56 @@ class TalkDojoEnterpriseApp {
       body: JSON.stringify({ id: this.activeAccountId, name }),
     });
 
-    await this.loadCompanyInfo(this.activeAccountId);
+    await this.loadAccounts();
+    await this.selectAccount(this.activeAccountId);
     this.showToast('Company info & organization profile saved!');
+  }
+
+  renderAccountSettings() {
+    const account = this.accounts.find(item => item.id === this.activeAccountId);
+    if (account) {
+      this.el.settingsCurrentAccountName.textContent = `${account.name} · ${account.id}`;
+    }
+  }
+
+  renderAccountSwitcher() {
+    if (!this.el.accountSwitcherList) return;
+    this.el.accountSwitcherList.innerHTML = this.accounts.map(account => `
+      <button class="account-switch-card ${account.id === this.activeAccountId ? 'active' : ''}" data-account-id="${account.id}">
+        <div class="flex-between">
+          <strong>${account.name}</strong>
+          ${account.id === this.activeAccountId ? '<span class="badge-mini">CURRENT</span>' : ''}
+        </div>
+        <div class="text-xs text-muted mt-1">${account.id}</div>
+        <div class="text-xs mt-2">🤖 ${account.assistantName || 'Assistant'}</div>
+        <div class="account-card-stats">
+          <span class="badge-mini">📜 ${account.policiesCount || 0}</span>
+          <span class="badge-mini">📋 ${account.proceduresCount || 0}</span>
+          <span class="badge-mini">🏦 ${account.testsCount || 0}</span>
+          <span class="badge-mini">🛠️ ${account.toolsCount || 0}</span>
+        </div>
+      </button>
+    `).join('');
+
+    this.el.accountSwitcherList.querySelectorAll('.account-switch-card').forEach(card => {
+      card.addEventListener('click', async () => {
+        const accountId = card.dataset.accountId;
+        await this.selectAccount(accountId);
+        this.renderAccountSwitcher();
+        this.closeAccountSwitcher();
+        if (this.activeTab === 'accountsettings') this.navigate('accountsettings', 'overview');
+        else this.navigate(this.activeTab, this.activeSub);
+      });
+    });
+  }
+
+  openAccountSwitcher() {
+    this.renderAccountSwitcher();
+    this.el.accountSwitcherModal.classList.remove('hidden');
+  }
+
+  closeAccountSwitcher() {
+    this.el.accountSwitcherModal.classList.add('hidden');
   }
 
   async createNewAccountModal() {
@@ -844,8 +883,8 @@ class TalkDojoEnterpriseApp {
       });
       const acc = await res.json();
       await this.loadAccounts();
-      this.el.accountSelect.value = acc.id;
       await this.selectAccount(acc.id);
+      this.closeAccountSwitcher();
       this.navigate('account', 'info');
       this.showToast(`Created account "${acc.name}" with ID ${acc.id}`);
     } catch (e) {
@@ -2087,84 +2126,27 @@ class TalkDojoEnterpriseApp {
     }
   }
 
-  // --- TAB 5: ASSISTANTS (MASTER-DETAIL + EMBEDDED CHAT) ---
+  // --- TAB 6: SINGLE ASSISTANT + EMBEDDED CHAT ---
 
-  async loadAssistants(accountId) {
+  async loadAssistant(accountId) {
+    if (!accountId) return;
     try {
-      const res = await fetch(`/api/accounts/${accountId}/assistants`);
-      const assistants = await res.json();
-      this.assistants = assistants || [];
-      this.el.assistantSelect.innerHTML = assistants.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
-      this.el.certTargetAssistant.innerHTML = assistants.map(a => `<option value="${a.id}">${a.name} (${a.voice || 'Aoede'})</option>`).join('');
-      this.el.navBadgeAssistants.textContent = assistants.length;
-      this.el.assistantsTotalCount.textContent = assistants.length;
-
-      if (this.activeTab === 'assistants') {
-        this.loadAssistantsMasterDetail(this.activeSub === 'new', this.activeAssistantId);
-      }
-    } catch (e) {
-      console.error('Error loading assistants:', e);
-    }
-  }
-
-  selectAssistant(assistantId) {
-    this.activeAssistantId = assistantId;
-    this.el.assistantSelect.value = assistantId;
-    this.el.certTargetAssistant.value = assistantId;
-  }
-
-  loadAssistantsMasterDetail(isNew = false, selectId = null) {
-    const list = this.assistants || [];
-
-    if (list.length === 0 && !isNew) {
-      this.el.assistantsZeroState.classList.remove('hidden');
-      this.el.assistantEditorCard.classList.add('hidden');
-      this.el.assistantsMasterList.innerHTML = '<div class="text-xs text-dim text-center py-3">No assistants created.</div>';
-      return;
-    }
-
-    this.el.assistantsZeroState.classList.add('hidden');
-    this.el.assistantEditorCard.classList.remove('hidden');
-
-    if (selectId && list.some(a => a.id === selectId)) {
-      this.activeAssistantId = selectId;
-    } else if (!this.activeAssistantId || !list.some(a => a.id === this.activeAssistantId)) {
-      if (list.length > 0) this.activeAssistantId = list[0].id;
-    }
-
-    this.el.assistantsMasterList.innerHTML = list.map(a => `
-      <div class="asst-master-item ${!isNew && a.id === this.activeAssistantId ? 'active' : ''}" data-id="${a.id}">
-        <div class="asst-master-title">${a.name}</div>
-        <div class="asst-master-sub">${a.voice || 'Aoede'} · ${a.personality_style || 'Conversational'}</div>
-      </div>
-    `).join('');
-
-    this.el.assistantsMasterList.querySelectorAll('.asst-master-item').forEach(item => {
-      item.addEventListener('click', () => {
-        this.navigate('assistants', 'all', item.dataset.id);
-      });
-    });
-
-    if (isNew) {
-      this.el.editorHeading.textContent = 'Create New Virtual Assistant';
-      this.el.editorSubheading.textContent = 'Describe persona to populate fields, then save.';
+      const res = await fetch(`/api/accounts/${accountId}/assistant`);
+      if (!res.ok) throw new Error('Assistant not found');
+      this.assistant = await res.json();
+      this.activeAssistantId = this.assistant.id;
+      this.el.certAssistantSummary.textContent = `${this.assistant.name} · ${this.assistant.voice || 'Aoede'}`;
+      this.el.btnSnapshotCertify.disabled = false;
+      this.el.editorHeading.textContent = `Edit Assistant: ${this.assistant.name}`;
+      this.el.editorSubheading.textContent = 'Update the account assistant persona, guidelines, or voice timbre.';
       this.el.editorAiCreatorBox.classList.remove('hidden');
-      this.el.btnEditorDeleteAsst.classList.add('hidden');
-      this.el.asstNameInput.value = 'Sarah Lou Jenkins';
-      this.el.asstVoiceSelect.value = 'Aoede';
-      this.el.asstPersonalityInput.value = 'Warm Southern bedside manner, empathetic, calm.';
-      this.el.asstBackstoryInput.value = 'Sarah Lou has worked clinic front desks in East Tennessee for 12 years.';
-      this.renderAssistantRulesList(['Greet callers warmly with polite hospitality.', 'Maintain patience and clarity when handling appointments.']);
-    } else {
-      const activeAsst = list.find(a => a.id === this.activeAssistantId) || list[0];
-      if (!activeAsst) return;
-
-      this.el.editorHeading.textContent = `Edit Assistant: ${activeAsst.name}`;
-      this.el.editorSubheading.textContent = 'Update conversational guidelines or voice timbre.';
-      this.el.editorAiCreatorBox.classList.add('hidden');
-      this.el.btnEditorDeleteAsst.classList.remove('hidden');
-
-      this.populateAssistantForm(activeAsst);
+      this.populateAssistantForm(this.assistant);
+    } catch (e) {
+      this.assistant = null;
+      this.activeAssistantId = null;
+      this.el.certAssistantSummary.textContent = 'Assistant configuration unavailable';
+      this.el.btnSnapshotCertify.disabled = true;
+      console.error('Error loading assistant:', e);
     }
   }
 
@@ -2218,7 +2200,7 @@ class TalkDojoEnterpriseApp {
     if (!prompt) return this.showToast('Please describe your desired assistant.', 'error');
 
     try {
-      const res = await fetch(`/api/accounts/${this.activeAccountId}/assistants/describe`, {
+      const res = await fetch(`/api/accounts/${this.activeAccountId}/assistant/describe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
@@ -2267,11 +2249,8 @@ class TalkDojoEnterpriseApp {
 
     const rules = Array.from(this.el.asstRulesList.querySelectorAll('.asst-rule-input')).map(i => i.value.trim()).filter(Boolean);
 
-    const isNew = this.activeSub === 'new';
-    const id = isNew ? `asst-${Date.now()}` : this.activeAssistantId;
-
     const payload = {
-      id,
+      id: this.activeAssistantId || 'assistant',
       name,
       voice: this.el.asstVoiceSelect.value,
       personality_style: this.el.asstPersonalityInput.value.trim(),
@@ -2280,30 +2259,17 @@ class TalkDojoEnterpriseApp {
     };
 
     try {
-      await fetch(`/api/accounts/${this.activeAccountId}/assistants`, {
+      const res = await fetch(`/api/accounts/${this.activeAccountId}/assistant`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      await this.loadAssistants(this.activeAccountId);
-      this.navigate('assistants', 'all', id);
+      if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+      await this.loadAssistant(this.activeAccountId);
+      this.navigate('assistant', 'edit');
       this.showToast(`Assistant "${name}" saved!`);
     } catch (e) {
       this.showToast('Save assistant failed', 'error', e.message);
-    }
-  }
-
-  async deleteCurrentAssistant() {
-    if (!this.activeAssistantId) return;
-    if (!confirm('Send assistant to Recycle Bin?')) return;
-    try {
-      await fetch(`/api/accounts/${this.activeAccountId}/assistants/${this.activeAssistantId}`, { method: 'DELETE' });
-      this.activeAssistantId = null;
-      await this.loadAssistants(this.activeAccountId);
-      this.navigate('assistants', 'all');
-      this.showToast('Assistant moved to Recycle Bin');
-    } catch (e) {
-      this.showToast('Delete assistant failed', 'error', e.message);
     }
   }
 
@@ -2324,7 +2290,7 @@ class TalkDojoEnterpriseApp {
   }
 
   beginChatSession() {
-    const asst = this.assistants?.find(a => a.id === this.activeAssistantId);
+    const asst = this.assistant;
     if (!asst) return this.showToast('Please select an assistant first', 'error');
 
     this.chatSessionActive = true;
@@ -2364,11 +2330,7 @@ class TalkDojoEnterpriseApp {
     if (mode === 'pasted') {
       scenarioContext = this.el.chatPastedInput.value.trim();
     } else if (mode === 'scenario') {
-      let sc = null;
-      for (const p of this.procedures) {
-        sc = (p.test_scenarios || []).find(s => s.id === this.el.chatScenarioSelect.value);
-        if (sc) break;
-      }
+      const sc = (this.testScenarios || []).find(s => s.id === this.el.chatScenarioSelect.value);
       if (sc) scenarioContext = `${sc.title}\n${sc.description}`;
     }
 
@@ -2378,7 +2340,6 @@ class TalkDojoEnterpriseApp {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accountId: this.activeAccountId,
-          assistantId: this.activeAssistantId,
           message: text,
           history: this.chatSparringHistory,
           modality: this.chatModality,
@@ -2420,7 +2381,6 @@ class TalkDojoEnterpriseApp {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transcript: this.chatSparringHistory,
-          assistantId: this.activeAssistantId,
         }),
       });
       const evalData = await res.json();
@@ -2446,14 +2406,7 @@ class TalkDojoEnterpriseApp {
   }
 
   getAllEnabledScenarios() {
-    const list = [];
-    const enabledProcs = this.procedures.filter(p => p.status === 'enabled');
-    enabledProcs.forEach(p => {
-      (p.test_scenarios || []).forEach(sc => {
-        list.push({ ...sc, procedureName: p.name, procedureId: p.id });
-      });
-    });
-    return list;
+    return (this.testScenarios || []).filter(test => test.status === 'enabled');
   }
 
   renderCertTestsList() {
@@ -2461,7 +2414,7 @@ class TalkDojoEnterpriseApp {
     this.el.certFractionBadge.textContent = `0 / ${list.length}`;
 
     if (list.length === 0) {
-      this.el.certTestsList.innerHTML = '<div class="text-xs text-dim py-3 text-center">No scenarios in enabled procedures. Each enabled procedure requires at least 1 test scenario.</div>';
+      this.el.certTestsList.innerHTML = '<div class="text-xs text-dim py-3 text-center">No enabled test scenarios. Enable at least one scenario before certification.</div>';
       return;
     }
 
@@ -2470,7 +2423,7 @@ class TalkDojoEnterpriseApp {
         <span class="status-light status-light-gray" id="cert-light-${t.id}"></span>
         <div class="flex-1">
           <div class="text-xs font-bold">${t.title}</div>
-          <div class="text-dim" style="font-size:0.68rem;">[${t.procedureId}] ${t.callee?.role || 'Customer'} (${t.max_turns || 6} turns)</div>
+          <div class="text-dim" style="font-size:0.68rem;">${(t.linked_procedures || []).join(', ') || 'Policy-only scenario'} · ${t.callee?.role || t.customer_role || 'Customer'} (${t.max_turns || 6} turns)</div>
         </div>
       </div>
     `).join('');
@@ -2486,8 +2439,12 @@ class TalkDojoEnterpriseApp {
   }
 
   async startSnapshotCertification() {
-    const targetAsst = this.el.certTargetAssistant.value || this.activeAssistantId;
-    const asst = this.assistants?.find(a => a.id === targetAsst);
+    const asst = this.assistant;
+    if (!asst) {
+      this.showToast('Configure the account assistant before certification.', 'error');
+      this.navigate('assistant', 'edit');
+      return;
+    }
 
     this.el.certParamsCard.classList.add('hidden');
     this.el.certProgressBanner.classList.remove('hidden');
@@ -2509,12 +2466,11 @@ class TalkDojoEnterpriseApp {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          assistantId: targetAsst,
           bankId: this.activeBankId,
           mode: this.certMode,
         }),
       });
-      this.showToast('Certification suite launched across all enabled procedures!');
+      this.showToast('Certification suite launched across all enabled scenarios!');
     } catch (e) {
       this.showToast('Launch failed', 'error', e.message);
       this.el.certParamsCard.classList.remove('hidden');
@@ -2544,7 +2500,7 @@ class TalkDojoEnterpriseApp {
     if (!sc) return;
 
     this.el.certDetailTitle.textContent = sc.title;
-    this.el.certDetailSub.textContent = `Procedure: ${sc.procedureName || sc.procedureId} | Persona: ${sc.callee?.role}`;
+    this.el.certDetailSub.textContent = `Procedures: ${(sc.linked_procedures || []).join(', ') || 'None'} | Persona: ${sc.callee?.role || sc.customer_role || 'Customer'}`;
 
     const completedResult = this.currentCertSnapshot?.results?.find(r => r.scenarioId === testId);
 
@@ -2643,11 +2599,11 @@ class TalkDojoEnterpriseApp {
 
   async loadActiveDeploymentBadge() {
     try {
-      const res = await fetch(`/api/accounts/${this.activeAccountId}/certification/active-deployment`);
+      const res = await fetch(`/api/accounts/${this.activeAccountId}/certification/active`);
       const data = await res.json();
-      if (data && data.snapshot) {
+      if (data && data.activeSnapshot) {
         this.el.activeDeploymentBadge.classList.remove('hidden');
-        this.el.activeDeployText.textContent = `Active: ${data.snapshot.assistantName || 'Assistant'} (${data.snapshot.id})`;
+        this.el.activeDeployText.textContent = `Active: ${data.activeSnapshot.assistantName || 'Assistant'} (${data.activeSnapshot.snapshotId || data.activeSnapshot.id})`;
       } else {
         this.el.activeDeployText.textContent = 'Active: None';
       }
@@ -2660,7 +2616,7 @@ class TalkDojoEnterpriseApp {
     try {
       const res = await fetch(`/api/accounts/${this.activeAccountId}/recycle-bin`);
       const data = await res.json();
-      const count = data.items?.length || 0;
+      const count = Array.isArray(data) ? data.length : (data.items?.length || 0);
       this.el.recycleBinCount.textContent = count;
     } catch (e) {}
   }
@@ -2670,7 +2626,7 @@ class TalkDojoEnterpriseApp {
     try {
       const res = await fetch(`/api/accounts/${this.activeAccountId}/recycle-bin`);
       const data = await res.json();
-      const items = data.items || [];
+      const items = Array.isArray(data) ? data : (data.items || []);
       if (items.length === 0) {
         this.el.recycleBinList.innerHTML = '<div class="text-xs text-dim p-3">Recycle bin is empty.</div>';
         return;
@@ -2681,7 +2637,7 @@ class TalkDojoEnterpriseApp {
             <strong class="text-xs">${item.type.toUpperCase()}: ${item.name || item.id}</strong>
             <div class="text-dim text-xs">Deleted ${new Date(item.deletedAt).toLocaleTimeString()}</div>
           </div>
-          <button class="btn-soft-xs btn-restore-item" data-id="${item.id}">Restore</button>
+          <button class="btn-soft-xs btn-restore-item" data-id="${item.binItemId}">Restore</button>
         </div>
       `).join('');
 
@@ -2702,7 +2658,7 @@ class TalkDojoEnterpriseApp {
 
   async clearRecycleBinArchive() {
     if (!confirm('Permanently clear all items to audit archive?')) return;
-    await fetch(`/api/accounts/${this.activeAccountId}/recycle-bin/clear`, { method: 'POST' });
+    await fetch(`/api/accounts/${this.activeAccountId}/recycle-bin`, { method: 'DELETE' });
     this.closeRecycleBin();
     await this.refreshRecycleBinCount();
     this.showToast('Recycle bin cleared to archive');
@@ -2712,7 +2668,7 @@ class TalkDojoEnterpriseApp {
     const key = this.el.apiKeyInput.value.trim();
     if (!key) return this.showToast('API Key cannot be empty', 'error');
     try {
-      const res = await fetch('/api/config/api-key', {
+      const res = await fetch('/api/config/key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: key }),
