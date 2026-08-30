@@ -58,36 +58,28 @@ export class BatchRunner extends EventEmitter {
     this.isPaused = false;
     const startTime = Date.now();
 
-    // 1. Gather all test scenarios across all enabled procedures
-    const enabledProcedures = await this.accountManager.listProcedures(accountId, 'enabled');
-    let enabledTests = [];
+    // 1. Gather all enabled test scenarios
+    let enabledTests = await this.accountManager.listTests(accountId, 'enabled');
 
-    for (const proc of enabledProcedures) {
-      const scenarios = proc.test_scenarios || [];
-      if (scenarios.length === 0) {
-        this.isRunning = false;
-        throw new Error(`Procedure [${proc.ref_id}] "${proc.name}" has 0 test scenarios. Every enabled procedure must have at least 1 test scenario.`);
-      }
-      for (const scen of scenarios) {
-        enabledTests.push({
-          ...scen,
-          id: scen.id,
-          title: `[${proc.ref_id}] ${scen.title}`,
-          procedure_id: proc.id,
-          procedure_ref: proc.ref_id,
-          procedure_name: proc.name,
-          objective: scen.test_objective || scen.objective || proc.objective,
-          instructions: scen.secret_instructions || scen.instructions || '',
-          checklist: scen.checklist || [],
-          max_turns: scen.max_turns || maxTurns || 6,
-        });
-      }
-    }
-
-    // Fallback to legacy bank tests if no procedure tests
+    // Fallback to procedure test_scenarios if no top-level tests exist
     if (enabledTests.length === 0) {
-      const allTests = await this.accountManager.listTests(accountId, bankId, assistantId);
-      enabledTests = allTests.filter(t => t.enabled !== false);
+      const enabledProcedures = await this.accountManager.listProcedures(accountId, 'enabled');
+      for (const proc of enabledProcedures) {
+        for (const scen of (proc.test_scenarios || [])) {
+          enabledTests.push({
+            ...scen,
+            id: scen.id,
+            title: `[${proc.ref_id}] ${scen.title}`,
+            procedure_id: proc.id,
+            procedure_ref: proc.ref_id,
+            procedure_name: proc.name,
+            objective: scen.test_objective || scen.objective || proc.objective,
+            instructions: scen.secret_instructions || scen.instructions || '',
+            checklist: scen.checklist || [],
+            max_turns: scen.max_turns || maxTurns || 6,
+          });
+        }
+      }
     }
 
     if (enabledTests.length === 0) {

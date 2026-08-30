@@ -18,13 +18,19 @@ class TalkDojoEnterpriseApp {
     this.activeToolId = null;
     this.activePolicyId = null;
     this.activeProcedureId = null;
+    this.activeTestId = null;
     this.activeBankId = 'default-bank';
 
     this.policyFilter = 'all_enabled';
     this.procFilter = 'enabled';
+    this.testFilter = 'all';
 
     this.policies = [];
     this.procedures = [];
+    this.testScenarios = [];
+    this.coverageGaps = { uncovered_policies: [], uncovered_procedures: [], total_gaps: 0, has_gaps: false };
+    this.activeTestLinkedPolicies = [];
+    this.activeTestLinkedProcedures = [];
     this.virtualTools = [];
     this.assistants = [];
     this.companySections = [];
@@ -64,6 +70,10 @@ class TalkDojoEnterpriseApp {
       navBadgePolicies: document.getElementById('nav-badge-policies'),
       navBadgeProcedures: document.getElementById('nav-badge-procedures'),
       navBadgeProcDrafts: document.getElementById('nav-badge-proc-drafts'),
+      navBadgeScenariosWarning: document.getElementById('nav-badge-scenarios-warning'),
+      navBadgeTestScenarios: document.getElementById('nav-badge-testscenarios'),
+      navBadgeTestDrafts: document.getElementById('nav-badge-test-drafts'),
+      navBadgeGapsCount: document.getElementById('nav-badge-gaps-count'),
       navBadgeAssistants: document.getElementById('nav-badge-assistants'),
       navBadgeCert: document.getElementById('nav-badge-cert'),
 
@@ -138,8 +148,10 @@ class TalkDojoEnterpriseApp {
       policyConditionInput: document.getElementById('policy-condition-input'),
       policyActionLabel: document.getElementById('policy-action-label'),
       policyActionInput: document.getElementById('policy-action-input'),
+      policyUncoveredWarning: document.getElementById('policy-uncovered-warning'),
+      btnPolicyCreateTest: document.getElementById('btn-policy-create-test'),
 
-      // Tab 4: Procedures (Workflows & Integrated Test Scenarios)
+      // Tab 4: Procedures (Workflows & Granular Actions)
       paneProcedures: document.getElementById('pane-procedures'),
       btnProceduresNavNew: document.getElementById('btn-procedures-nav-new'),
       procFilterBtns: document.querySelectorAll('.proc-filter-btn'),
@@ -160,23 +172,48 @@ class TalkDojoEnterpriseApp {
       procToolsCheckboxes: document.getElementById('proc-tools-checkboxes'),
       procStepsInput: document.getElementById('proc-steps-input'),
       procConstraintsInput: document.getElementById('proc-constraints-input'),
-      procScenariosList: document.getElementById('proc-scenarios-list'),
-      btnProcAddScenario: document.getElementById('btn-proc-add-scenario'),
+      procUncoveredWarning: document.getElementById('proc-uncovered-warning'),
+      btnProcCreateTest: document.getElementById('btn-proc-create-test'),
+      procTestsCoverageList: document.getElementById('proc-tests-coverage-list'),
+      btnProcGotoTests: document.getElementById('btn-proc-goto-tests'),
 
-      // Scenario Modal
-      scenarioModal: document.getElementById('scenario-modal'),
-      scenarioModalTitle: document.getElementById('scenario-modal-title'),
-      btnCloseScenarioModal: document.getElementById('btn-close-scenario-modal'),
-      scenModalTitle: document.getElementById('scen-modal-title'),
-      scenModalRole: document.getElementById('scen-modal-role'),
-      scenModalObjective: document.getElementById('scen-modal-objective'),
-      scenModalInstructions: document.getElementById('scen-modal-instructions'),
-      scenModalChecklist: document.getElementById('scen-modal-checklist'),
-      btnModalAddCheck: document.getElementById('btn-modal-add-check'),
-      btnModalDeleteScen: document.getElementById('btn-modal-delete-scen'),
-      btnModalSaveScen: document.getElementById('btn-modal-save-scen'),
+      // Tab 5: Test Scenarios (Top-Level Test Banks & Coverage)
+      paneTestScenarios: document.getElementById('pane-testscenarios'),
+      testscenariosGapBanner: document.getElementById('testscenarios-gap-banner'),
+      gapBannerCount: document.getElementById('gap-banner-count'),
+      btnBannerCreateGapDrafts: document.getElementById('btn-banner-create-gap-drafts'),
+      gapBannerPills: document.getElementById('gap-banner-pills'),
+      btnTestsGapDraft: document.getElementById('btn-tests-gap-draft'),
+      btnTestScenariosNavNew: document.getElementById('btn-testscenarios-nav-new'),
+      testFilterBtns: document.querySelectorAll('.test-filter-btn'),
+      filterBadgeTestDrafts: document.getElementById('filter-badge-test-drafts'),
+      filterBadgeTestGaps: document.getElementById('filter-badge-test-gaps'),
+      testsMasterCount: document.getElementById('tests-master-count'),
+      btnMasterAddTest: document.getElementById('btn-master-add-test'),
+      testsMasterList: document.getElementById('tests-master-list'),
+      testsZeroState: document.getElementById('tests-zero-state'),
+      btnEmptyStartTest: document.getElementById('btn-empty-start-test'),
+      testEditorCard: document.getElementById('test-editor-card'),
+      testRefIdBadge: document.getElementById('test-ref-id-badge'),
+      testEditorTitle: document.getElementById('test-editor-title'),
+      testEditorSub: document.getElementById('test-editor-sub'),
+      btnTestDelete: document.getElementById('btn-test-delete'),
+      btnTestSave: document.getElementById('btn-test-save'),
+      testTitleInput: document.getElementById('test-title-input'),
+      testStatusSelect: document.getElementById('test-status-select'),
+      btnTestSuggestLinks: document.getElementById('btn-test-suggest-links'),
+      btnTestAddLinkPicker: document.getElementById('btn-test-add-link-picker'),
+      testActiveLinksList: document.getElementById('test-active-links-list'),
+      testSuggestedLinksBox: document.getElementById('test-suggested-links-box'),
+      testSuggestedLinksList: document.getElementById('test-suggested-links-list'),
+      testRoleInput: document.getElementById('test-role-input'),
+      testMaxTurnsInput: document.getElementById('test-max-turns-input'),
+      testObjectiveInput: document.getElementById('test-objective-input'),
+      testSecretInstructionsInput: document.getElementById('test-secret-instructions-input'),
+      btnTestAddCriteria: document.getElementById('btn-test-add-criteria'),
+      testCriteriaList: document.getElementById('test-criteria-list'),
 
-      // Tab 5: Assistants (Master-Detail + Embedded Chat)
+      // Tab 6: Assistants (Master-Detail + Embedded Chat)
       btnAsstNavNew: document.getElementById('btn-asst-nav-new'),
       assistantsTotalCount: document.getElementById('assistants-total-count'),
       btnMasterNewAsst: document.getElementById('btn-master-new-asst'),
@@ -457,17 +494,49 @@ class TalkDojoEnterpriseApp {
         this.loadProcedures(this.activeAccountId, this.procFilter);
       });
     });
-    this.el.btnProcedureSave.addEventListener('click', () => this.saveCurrentProcedure());
-    this.el.btnProcedureDelete.addEventListener('click', () => this.deleteCurrentProcedure());
-    this.el.btnProcAddScenario.addEventListener('click', () => this.openScenarioModalForNew());
+    if (this.el.btnProcedureSave) this.el.btnProcedureSave.addEventListener('click', () => this.saveCurrentProcedure());
+    if (this.el.btnProcedureDelete) this.el.btnProcedureDelete.addEventListener('click', () => this.deleteCurrentProcedure());
 
-    // Scenario Modal
-    this.el.btnCloseScenarioModal.addEventListener('click', () => this.closeScenarioModal());
-    this.el.btnModalAddCheck.addEventListener('click', () => this.addScenarioChecklistRow());
-    this.el.btnModalSaveScen.addEventListener('click', () => this.saveScenarioFromModal());
-    this.el.btnModalDeleteScen.addEventListener('click', () => this.deleteScenarioFromModal());
+    // Policy & Procedure Coverage Warnings
+    if (this.el.btnPolicyCreateTest) {
+      this.el.btnPolicyCreateTest.addEventListener('click', () => {
+        const pol = this.policies.find(p => p.id === this.activePolicyId);
+        this.createNewTestScenario({ linked_policies: pol ? [pol.ref_id || pol.id] : [] });
+      });
+    }
+    if (this.el.btnProcCreateTest) {
+      this.el.btnProcCreateTest.addEventListener('click', () => {
+        const proc = this.procedures.find(p => p.id === this.activeProcedureId);
+        this.createNewTestScenario({ linked_procedures: proc ? [proc.ref_id || proc.id] : [] });
+      });
+    }
+    if (this.el.btnProcGotoTests) {
+      this.el.btnProcGotoTests.addEventListener('click', () => {
+        this.navigate('testscenarios', 'all');
+      });
+    }
 
-    // Tab 5: Assistants
+    // Tab 5: Test Scenarios
+    if (this.el.btnTestScenariosNavNew) this.el.btnTestScenariosNavNew.addEventListener('click', () => this.createNewTestScenario());
+    if (this.el.btnMasterAddTest) this.el.btnMasterAddTest.addEventListener('click', () => this.createNewTestScenario());
+    if (this.el.btnEmptyStartTest) this.el.btnEmptyStartTest.addEventListener('click', () => this.createNewTestScenario());
+    if (this.el.btnTestsGapDraft) this.el.btnTestsGapDraft.addEventListener('click', () => this.generateGapDraftTests());
+    if (this.el.btnBannerCreateGapDrafts) this.el.btnBannerCreateGapDrafts.addEventListener('click', () => this.generateGapDraftTests());
+    this.el.testFilterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.el.testFilterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.testFilter = btn.dataset.filter;
+        this.loadTestScenarios(this.activeAccountId, this.testFilter);
+      });
+    });
+    if (this.el.btnTestSave) this.el.btnTestSave.addEventListener('click', () => this.saveCurrentTestScenario());
+    if (this.el.btnTestDelete) this.el.btnTestDelete.addEventListener('click', () => this.deleteCurrentTestScenario());
+    if (this.el.btnTestSuggestLinks) this.el.btnTestSuggestLinks.addEventListener('click', () => this.suggestLinksForCurrentTest());
+    if (this.el.btnTestAddLinkPicker) this.el.btnTestAddLinkPicker.addEventListener('click', () => this.openAddLinkPickerModal());
+    if (this.el.btnTestAddCriteria) this.el.btnTestAddCriteria.addEventListener('click', () => this.addTestCriteriaRow());
+
+    // Tab 6: Assistants
     this.el.btnAsstNavNew.addEventListener('click', () => this.navigate('assistants', 'new'));
     this.el.btnMasterNewAsst.addEventListener('click', () => this.navigate('assistants', 'new'));
     this.el.btnEmptyStartAssistant.addEventListener('click', () => this.navigate('assistants', 'new'));
@@ -577,6 +646,15 @@ class TalkDojoEnterpriseApp {
         this.loadProcedures(this.activeAccountId, this.procFilter, id);
       }
     }
+    if (tabId === 'testscenarios') {
+      const isNew = sub === 'new';
+      if (isNew) {
+        this.createNewTestScenario();
+      } else {
+        this.testFilter = sub || 'all';
+        this.loadTestScenarios(this.activeAccountId, this.testFilter, id);
+      }
+    }
     if (tabId === 'assistants') {
       const isNew = sub === 'new';
       this.loadAssistantsMasterDetail(isNew, id);
@@ -622,6 +700,8 @@ class TalkDojoEnterpriseApp {
       await this.loadVirtualTools();
       await this.loadPolicies(accountId, this.policyFilter);
       await this.loadProcedures(accountId, this.procFilter);
+      await this.loadTestScenarios(accountId, this.testFilter);
+      await this.loadCoverageGaps(accountId);
       await this.loadAssistants(accountId);
       await this.refreshRecycleBinCount();
       await this.loadActiveDeploymentBadge();
@@ -1105,7 +1185,7 @@ class TalkDojoEnterpriseApp {
   populatePolicyForm(policy) {
     if (!policy) return;
     this.el.policyRefIdBadge.textContent = policy.id;
-    this.el.policyEditorTitle.textContent = `Edit Policy ${policy.id}`;
+    this.el.policyEditorTitle.textContent = policy.title || 'Edit Policy';
     this.el.policyTitleInput.value = policy.title || '';
     this.el.policyTypeSelect.value = policy.type || 'always';
     this.el.policyStatusSelect.value = policy.status || 'enabled';
@@ -1114,6 +1194,13 @@ class TalkDojoEnterpriseApp {
 
     this.el.policyConditionRow.classList.toggle('hidden', policy.type !== 'conditional');
     this.el.policyActionLabel.textContent = policy.type === 'never' ? 'Prohibited Action / Guardrail' : 'Mandatory Action / Directive';
+
+    // Coverage Gap Warning check
+    if (this.el.policyUncoveredWarning) {
+      const isUncovered = (this.coverageGaps.uncovered_policies || []).some(p => p.id === policy.id || p.ref_id === policy.id);
+      this.el.policyUncoveredWarning.classList.toggle('hidden', !isUncovered);
+    }
+
     this.adjustAllAutoGrow();
   }
 
@@ -1234,81 +1321,98 @@ class TalkDojoEnterpriseApp {
   populateProcedureForm(proc) {
     if (!proc) return;
     this.el.procRefIdBadge.textContent = proc.id;
-    this.el.procEditorTitle.textContent = `Edit Procedure ${proc.id}`;
+    this.el.procEditorTitle.textContent = proc.name || 'Edit Procedure';
     this.el.procNameInput.value = proc.name || '';
     this.el.procStatusSelect.value = proc.status || 'enabled';
     this.el.procObjectiveInput.value = proc.objective || '';
     this.el.procStepsInput.value = proc.steps || '';
     this.el.procConstraintsInput.value = proc.constraints || '';
 
-    // Authorized tools checkboxes
-    const vtools = this.virtualTools || [];
-    const authorized = proc.authorized_tools || [];
-    this.el.procToolsCheckboxes.innerHTML = vtools.map(t => `
-      <label class="tool-checkbox-item">
-        <input type="checkbox" value="${t.id}" ${authorized.includes(t.id) ? 'checked' : ''}>
-        <span>🛠️ ${t.name}</span>
-      </label>
-    `).join('');
+    // Coverage Gap Warning check
+    if (this.el.procUncoveredWarning) {
+      const isUncovered = (this.coverageGaps.uncovered_procedures || []).some(p => p.id === proc.id || p.ref_id === proc.id);
+      this.el.procUncoveredWarning.classList.toggle('hidden', !isUncovered);
+    }
 
-    // Render linked scenarios
-    this.renderProcedureScenariosList(proc.test_scenarios || []);
+    // Render Grouped Service Accordions with Action Checkboxes
+    this.renderProcedureToolsAccordions(proc);
+
+    // Render covering tests list
+    if (this.el.procTestsCoverageList) {
+      const coveringTests = (this.testScenarios || []).filter(t =>
+        (t.linked_procedures || []).includes(proc.id) ||
+        (t.linked_procedures || []).includes(proc.ref_id)
+      );
+      if (coveringTests.length > 0) {
+        this.el.procTestsCoverageList.innerHTML = coveringTests.map(t => `
+          <span class="linked-pill-tag pill-proc" data-test-id="${t.id}" title="Click to view in Test Scenarios">
+            🏦 [${t.ref_id || t.id}] ${t.title}
+          </span>
+        `).join('');
+        this.el.procTestsCoverageList.querySelectorAll('.linked-pill-tag').forEach(tag => {
+          tag.addEventListener('click', () => {
+            this.navigate('testscenarios', 'all', tag.dataset.testId);
+          });
+        });
+      } else {
+        this.el.procTestsCoverageList.innerHTML = '<span class="text-xs text-dim">No covering tests linked yet.</span>';
+      }
+    }
+
     this.adjustAllAutoGrow();
   }
 
-  renderProcedureScenariosList(scenarios) {
-    if (scenarios.length === 0) {
-      this.el.procScenariosList.innerHTML = `
-        <div class="text-xs text-dim p-2">No test scenarios linked. Click "+ Add Test Scenario" to author one (Every enabled procedure requires at least 1 test scenario).</div>
-      `;
+  renderProcedureToolsAccordions(proc = null) {
+    const vtools = this.virtualTools || [];
+    if (vtools.length === 0) {
+      this.el.procToolsCheckboxes.innerHTML = '<div class="text-xs text-dim p-2">No tools registered in this organization. Add tools in the Tools section.</div>';
       return;
     }
 
-    this.el.procScenariosList.innerHTML = scenarios.map((sc, i) => {
-      const role = sc.callee?.role || sc.customer_role || 'Customer';
-      const criteriaCount = (sc.evaluation_checklist?.length) || (sc.checklist?.length) || 0;
+    const authorized = proc ? (proc.authorized_actions || proc.authorized_tools || []) : [];
+
+    this.el.procToolsCheckboxes.innerHTML = vtools.map(t => {
+      const endpoints = t.endpoints || [];
+      const checkedCount = endpoints.filter(ep =>
+        authorized.includes(ep.name) ||
+        authorized.includes(`${t.id}:${ep.name}`) ||
+        authorized.includes(t.id)
+      ).length;
+
       return `
-      <div class="scenario-item-card" data-idx="${i}" data-proc-id="${this.activeProcedureId}">
-        <div>
-          <div class="text-xs font-bold">${sc.title || `Scenario #${i + 1}`}</div>
-          <div class="text-dim text-xs">${role} · ${criteriaCount} evaluation criteria</div>
+        <div class="tool-accordion">
+          <div class="tool-accordion-header" data-tool-id="${t.id}">
+            <div class="flex-center gap-2">
+              <span>🛠️</span>
+              <strong>${t.name}</strong>
+              <span class="badge-mini">${checkedCount}/${endpoints.length} actions</span>
+            </div>
+            <span class="tree-arrow">▾</span>
+          </div>
+          <div class="tool-accordion-body">
+            ${endpoints.length === 0 ? '<div class="text-xs text-dim">No endpoints defined.</div>' : endpoints.map(ep => {
+              const isChecked = authorized.includes(ep.name) ||
+                                authorized.includes(`${t.id}:${ep.name}`) ||
+                                authorized.includes(t.id);
+              return `
+                <label class="action-check-item">
+                  <input type="checkbox" class="proc-action-checkbox" data-service="${t.id}" value="${ep.name}" ${isChecked ? 'checked' : ''}>
+                  <div>
+                    <strong>${ep.name}</strong>
+                    <div class="text-xs text-dim">${ep.description || ''}</div>
+                  </div>
+                </label>
+              `;
+            }).join('')}
+          </div>
         </div>
-        <div class="flex-center gap-2">
-          <button type="button" class="btn-soft-xs btn-edit-scen" data-idx="${i}" data-proc-id="${this.activeProcedureId}">Edit</button>
-          <button type="button" class="btn-icon-soft btn-del-scen" data-idx="${i}" data-proc-id="${this.activeProcedureId}">✕</button>
-        </div>
-      </div>
-    `;
+      `;
     }).join('');
 
-    this.el.procScenariosList.querySelectorAll('.btn-edit-scen').forEach(b => {
-      b.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const idx = parseInt(b.dataset.idx, 10);
-        const procId = b.dataset.procId || this.activeProcedureId;
-        this.openScenarioModalForEdit(idx, procId);
-      });
-    });
-
-    this.el.procScenariosList.querySelectorAll('.btn-del-scen').forEach(b => {
-      b.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const idx = parseInt(b.dataset.idx, 10);
-        const procId = b.dataset.procId || this.activeProcedureId;
-        const proc = this.procedures.find(p => p.id === procId || p.ref_id === procId);
-        if (proc && proc.test_scenarios && proc.test_scenarios[idx]) {
-          const sc = proc.test_scenarios[idx];
-          if (!confirm(`Delete test scenario "${sc.title || sc.id}"?`)) return;
-          try {
-            await fetch(`/api/accounts/${this.activeAccountId}/procedures/${proc.id}/scenarios/${sc.id}`, { method: 'DELETE' });
-            await this.loadProcedures(this.activeAccountId, this.procFilter, proc.id);
-            this.showToast('Scenario deleted');
-          } catch (err) {
-            this.showToast('Delete scenario failed', 'error', err.message);
-          }
-        }
+    this.el.procToolsCheckboxes.querySelectorAll('.tool-accordion-header').forEach(hdr => {
+      hdr.addEventListener('click', () => {
+        const body = hdr.nextElementSibling;
+        body.classList.toggle('hidden');
       });
     });
   }
@@ -1323,15 +1427,10 @@ class TalkDojoEnterpriseApp {
     this.el.procStepsInput.value = '';
     this.el.procConstraintsInput.value = '';
 
-    const vtools = this.virtualTools || [];
-    this.el.procToolsCheckboxes.innerHTML = vtools.map(t => `
-      <label class="tool-checkbox-item">
-        <input type="checkbox" value="${t.id}" checked>
-        <span>🛠️ ${t.name}</span>
-      </label>
-    `).join('');
+    if (this.el.procUncoveredWarning) this.el.procUncoveredWarning.classList.add('hidden');
+    this.renderProcedureToolsAccordions(null);
+    if (this.el.procTestsCoverageList) this.el.procTestsCoverageList.innerHTML = '<span class="text-xs text-dim">Will be linkable after saving.</span>';
 
-    this.renderProcedureScenariosList([]);
     this.el.proceduresZeroState.classList.add('hidden');
     this.el.procedureEditorCard.classList.remove('hidden');
     this.el.procNameInput.focus();
@@ -1341,9 +1440,11 @@ class TalkDojoEnterpriseApp {
     const name = this.el.procNameInput.value.trim();
     if (!name) return this.showToast('Procedure name is required', 'error');
 
-    const authorized_tools = Array.from(this.el.procToolsCheckboxes.querySelectorAll('input:checked')).map(i => i.value);
+    const authorized_actions = Array.from(this.el.procToolsCheckboxes.querySelectorAll('.proc-action-checkbox:checked')).map(i => i.value);
+    const authorized_tools = Array.from(new Set(
+      Array.from(this.el.procToolsCheckboxes.querySelectorAll('.proc-action-checkbox:checked')).map(i => i.dataset.service)
+    ));
 
-    // Keep existing scenarios
     const existing = this.procedures.find(p => p.id === this.activeProcedureId);
     const test_scenarios = existing?.test_scenarios || [];
 
@@ -1353,6 +1454,7 @@ class TalkDojoEnterpriseApp {
       status: this.el.procStatusSelect.value,
       objective: this.el.procObjectiveInput.value.trim(),
       authorized_tools,
+      authorized_actions,
       steps: this.el.procStepsInput.value.trim(),
       constraints: this.el.procConstraintsInput.value.trim(),
       test_scenarios,
@@ -1367,6 +1469,7 @@ class TalkDojoEnterpriseApp {
       const saved = await res.json();
       this.activeProcedureId = saved.id;
       await this.loadProcedures(this.activeAccountId, this.procFilter, saved.id);
+      await this.loadCoverageGaps(this.activeAccountId);
       this.showToast(`Procedure [${saved.id}] saved!`);
     } catch (e) {
       this.showToast('Save procedure failed', 'error', e.message);
@@ -1380,13 +1483,456 @@ class TalkDojoEnterpriseApp {
       await fetch(`/api/accounts/${this.activeAccountId}/procedures/${this.activeProcedureId}`, { method: 'DELETE' });
       this.activeProcedureId = null;
       await this.loadProcedures(this.activeAccountId, this.procFilter);
+      await this.loadCoverageGaps(this.activeAccountId);
       this.showToast('Procedure deleted');
     } catch (e) {
       this.showToast('Delete procedure failed', 'error', e.message);
     }
   }
 
-  // --- INTEGRATED SCENARIO MODAL CONTROLLER ---
+  // --- TAB 5: TEST SCENARIOS (STANDALONE SUITE & COVERAGE) ---
+
+  async loadTestScenarios(accountId, filter = 'all', selectId = null) {
+    if (!accountId) return;
+    try {
+      const res = await fetch(`/api/accounts/${accountId}/test-scenarios?filter=${filter}`);
+      const tests = await res.json();
+      this.testScenarios = tests || [];
+
+      if (this.el.navBadgeTestScenarios) this.el.navBadgeTestScenarios.textContent = tests.length;
+      if (this.el.testsMasterCount) this.el.testsMasterCount.textContent = tests.length;
+
+      const draftsCount = (this.testScenarios || []).filter(t => t.status === 'draft').length;
+      if (this.el.navBadgeTestDrafts) this.el.navBadgeTestDrafts.textContent = draftsCount;
+      if (this.el.filterBadgeTestDrafts) this.el.filterBadgeTestDrafts.textContent = draftsCount;
+
+      this.renderTestScenariosMasterDetail(selectId);
+    } catch (e) {
+      console.error('Error loading test scenarios:', e);
+    }
+  }
+
+  async loadCoverageGaps(accountId) {
+    if (!accountId) return;
+    try {
+      const res = await fetch(`/api/accounts/${accountId}/test-scenarios/gaps`);
+      const gaps = await res.json();
+      this.coverageGaps = gaps || { uncovered_policies: [], uncovered_procedures: [], total_gaps: 0, has_gaps: false };
+
+      const count = this.coverageGaps.total_gaps || 0;
+      if (this.el.navBadgeScenariosWarning) {
+        this.el.navBadgeScenariosWarning.classList.toggle('hidden', count === 0);
+        this.el.navBadgeScenariosWarning.textContent = `⚠️ ${count}`;
+      }
+      if (this.el.navBadgeGapsCount) this.el.navBadgeGapsCount.textContent = count;
+      if (this.el.filterBadgeTestGaps) this.el.filterBadgeTestGaps.textContent = count;
+
+      // Update Coverage Gap Alert Card
+      if (this.el.testscenariosGapBanner) {
+        this.el.testscenariosGapBanner.classList.toggle('hidden', count === 0);
+        if (this.el.gapBannerCount) this.el.gapBannerCount.textContent = count;
+        if (this.el.gapBannerPills) {
+          const polPills = (this.coverageGaps.uncovered_policies || []).map(p =>
+            `<span class="linked-pill-tag pill-pol" title="Uncovered Policy: ${p.title}">📜 ${p.ref_id}: ${p.title}</span>`
+          ).join('');
+          const procPills = (this.coverageGaps.uncovered_procedures || []).map(p =>
+            `<span class="linked-pill-tag pill-proc" title="Uncovered Procedure: ${p.name}">📋 ${p.ref_id}: ${p.name}</span>`
+          ).join('');
+          this.el.gapBannerPills.innerHTML = polPills + procPills;
+        }
+      }
+
+      if (this.el.btnTestsGapDraft) {
+        this.el.btnTestsGapDraft.classList.toggle('hidden', count === 0);
+      }
+    } catch (e) {
+      console.error('Error loading coverage gaps:', e);
+    }
+  }
+
+  renderTestScenariosMasterDetail(selectId = null) {
+    if (!this.el.testsMasterList) return;
+    const list = this.testScenarios || [];
+    if (list.length === 0) {
+      if (this.el.testsZeroState) this.el.testsZeroState.classList.remove('hidden');
+      if (this.el.testEditorCard) this.el.testEditorCard.classList.add('hidden');
+      this.el.testsMasterList.innerHTML = '<div class="text-xs text-dim text-center py-3">No scenarios found.</div>';
+      return;
+    }
+
+    if (this.el.testsZeroState) this.el.testsZeroState.classList.add('hidden');
+    if (this.el.testEditorCard) this.el.testEditorCard.classList.remove('hidden');
+
+    if (selectId && list.some(t => t.id === selectId)) {
+      this.activeTestId = selectId;
+    } else if (!this.activeTestId || !list.some(t => t.id === this.activeTestId)) {
+      this.activeTestId = list[0].id;
+    }
+
+    this.el.testsMasterList.innerHTML = list.map(t => {
+      const polCount = (t.linked_policies || []).length;
+      const procCount = (t.linked_procedures || []).length;
+      const linksSummary = [
+        polCount > 0 ? `${polCount} pol` : '',
+        procCount > 0 ? `${procCount} proc` : '',
+      ].filter(Boolean).join(' · ');
+
+      return `
+        <div class="asst-master-item ${t.id === this.activeTestId ? 'active' : ''}" data-id="${t.id}">
+          <div class="flex-between">
+            <span class="ref-badge ref-badge-proc">${t.ref_id || t.id}</span>
+            <span class="badge-mini ${t.status === 'draft' ? 'badge-warn' : ''}">${t.status.toUpperCase()}</span>
+          </div>
+          <div class="asst-master-title mt-1">${t.title}</div>
+          <div class="asst-master-sub">${linksSummary ? `Linked: ${linksSummary}` : 'No links attached'}</div>
+        </div>
+      `;
+    }).join('');
+
+    this.el.testsMasterList.querySelectorAll('.asst-master-item').forEach(item => {
+      item.addEventListener('click', () => {
+        this.activeTestId = item.dataset.id;
+        this.navigate('testscenarios', this.testFilter, this.activeTestId);
+        this.renderTestScenariosMasterDetail(this.activeTestId);
+      });
+    });
+
+    const activeTest = list.find(t => t.id === this.activeTestId) || list[0];
+    this.populateTestScenarioForm(activeTest);
+  }
+
+  populateTestScenarioForm(test) {
+    if (!test) return;
+    if (this.el.testRefIdBadge) this.el.testRefIdBadge.textContent = test.ref_id || test.id;
+    if (this.el.testEditorTitle) this.el.testEditorTitle.textContent = test.title || 'Edit Test Scenario';
+    if (this.el.testTitleInput) this.el.testTitleInput.value = test.title || '';
+    if (this.el.testStatusSelect) this.el.testStatusSelect.value = test.status || 'enabled';
+    if (this.el.testRoleInput) this.el.testRoleInput.value = test.callee?.role || test.customer_role || '';
+    if (this.el.testMaxTurnsInput) this.el.testMaxTurnsInput.value = test.max_turns || 6;
+    if (this.el.testObjectiveInput) this.el.testObjectiveInput.value = test.description || test.test_objective || '';
+    if (this.el.testSecretInstructionsInput) this.el.testSecretInstructionsInput.value = test.callee?.secret_instructions || test.secret_instructions || '';
+
+    this.activeTestLinkedPolicies = [...(test.linked_policies || [])];
+    this.activeTestLinkedProcedures = [...(test.linked_procedures || [])];
+    this.renderActiveTestLinks();
+
+    // Hide suggestions box initially
+    if (this.el.testSuggestedLinksBox) this.el.testSuggestedLinksBox.classList.add('hidden');
+
+    // Render criteria checklist
+    const checklist = test.evaluation_checklist || test.checklist || [];
+    this.renderTestCriteriaList(checklist);
+
+    this.adjustAllAutoGrow();
+  }
+
+  renderActiveTestLinks() {
+    if (!this.el.testActiveLinksList) return;
+    const pols = this.activeTestLinkedPolicies || [];
+    const procs = this.activeTestLinkedProcedures || [];
+
+    if (pols.length === 0 && procs.length === 0) {
+      this.el.testActiveLinksList.innerHTML = '<span class="text-xs text-dim">No policies or procedures linked yet. Click "+ Link Item" or "✨ AI Suggest Links".</span>';
+      return;
+    }
+
+    const polItems = pols.map(pId => `
+      <span class="linked-pill-tag pill-pol" data-id="${pId}">
+        📜 ${pId}
+        <span class="pill-remove btn-del-pol-link" data-id="${pId}" title="Unlink Policy">✕</span>
+      </span>
+    `).join('');
+
+    const procItems = procs.map(pId => `
+      <span class="linked-pill-tag pill-proc" data-id="${pId}">
+        📋 ${pId}
+        <span class="pill-remove btn-del-proc-link" data-id="${pId}" title="Unlink Procedure">✕</span>
+      </span>
+    `).join('');
+
+    this.el.testActiveLinksList.innerHTML = polItems + procItems;
+
+    this.el.testActiveLinksList.querySelectorAll('.btn-del-pol-link').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.activeTestLinkedPolicies = this.activeTestLinkedPolicies.filter(id => id !== btn.dataset.id);
+        this.renderActiveTestLinks();
+      });
+    });
+
+    this.el.testActiveLinksList.querySelectorAll('.btn-del-proc-link').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.activeTestLinkedProcedures = this.activeTestLinkedProcedures.filter(id => id !== btn.dataset.id);
+        this.renderActiveTestLinks();
+      });
+    });
+  }
+
+  renderTestCriteriaList(checklist) {
+    if (!this.el.testCriteriaList) return;
+    if (checklist.length === 0) {
+      this.el.testCriteriaList.innerHTML = '<div class="text-xs text-dim p-2">No criteria defined. Click "+ Add Criteria" to add verification goals.</div>';
+      return;
+    }
+
+    this.el.testCriteriaList.innerHTML = checklist.map((c, i) => {
+      const goalText = typeof c === 'string' ? c : (c.goal || '');
+      const req = typeof c === 'object' ? c.required !== false : true;
+      return `
+        <div class="policy-item" data-idx="${i}">
+          <span class="policy-num">#${i + 1}</span>
+          <input type="text" class="test-criteria-input" value="${goalText.replace(/"/g, '&quot;')}" placeholder="e.g. Verified caller date of birth per POL-001">
+          <label class="flex-center gap-1 text-xs text-dim cursor-pointer">
+            <input type="checkbox" class="test-criteria-req" ${req ? 'checked' : ''}>
+            <span>Req</span>
+          </label>
+          <button class="btn-icon-soft btn-del-criteria">✕</button>
+        </div>
+      `;
+    }).join('');
+
+    this.el.testCriteriaList.querySelectorAll('.btn-del-criteria').forEach(b => {
+      b.addEventListener('click', (e) => e.target.closest('.policy-item').remove());
+    });
+  }
+
+  addTestCriteriaRow(goal = '', required = true) {
+    if (!this.el.testCriteriaList) return;
+    const div = document.createElement('div');
+    div.className = 'policy-item';
+    const count = this.el.testCriteriaList.querySelectorAll('.policy-item').length + 1;
+    div.innerHTML = `
+      <span class="policy-num">#${count}</span>
+      <input type="text" class="test-criteria-input" value="${goal.replace(/"/g, '&quot;')}" placeholder="e.g. Followed authorized workflow step">
+      <label class="flex-center gap-1 text-xs text-dim cursor-pointer">
+        <input type="checkbox" class="test-criteria-req" ${required ? 'checked' : ''}>
+        <span>Req</span>
+      </label>
+      <button class="btn-icon-soft btn-del-criteria">✕</button>
+    `;
+    div.querySelector('.btn-del-criteria').addEventListener('click', () => div.remove());
+    this.el.testCriteriaList.appendChild(div);
+    div.querySelector('.test-criteria-input').focus();
+  }
+
+  createNewTestScenario(defaults = {}) {
+    this.activeTestId = null;
+    if (this.el.testRefIdBadge) this.el.testRefIdBadge.textContent = 'TEST-NEW';
+    if (this.el.testEditorTitle) this.el.testEditorTitle.textContent = 'Create New Test Scenario';
+    if (this.el.testTitleInput) this.el.testTitleInput.value = defaults.title || '';
+    if (this.el.testStatusSelect) this.el.testStatusSelect.value = defaults.status || 'enabled';
+    if (this.el.testRoleInput) this.el.testRoleInput.value = defaults.role || 'Caller inquiring regarding services';
+    if (this.el.testMaxTurnsInput) this.el.testMaxTurnsInput.value = 6;
+    if (this.el.testObjectiveInput) this.el.testObjectiveInput.value = defaults.objective || '';
+    if (this.el.testSecretInstructionsInput) this.el.testSecretInstructionsInput.value = defaults.secret_instructions || '';
+
+    this.activeTestLinkedPolicies = Array.isArray(defaults.linked_policies) ? [...defaults.linked_policies] : [];
+    this.activeTestLinkedProcedures = Array.isArray(defaults.linked_procedures) ? [...defaults.linked_procedures] : [];
+    this.renderActiveTestLinks();
+
+    this.renderTestCriteriaList([
+      { id: 'c1', goal: 'Representative handled inquiry politely and followed company policies', required: true },
+    ]);
+
+    if (this.el.testsZeroState) this.el.testsZeroState.classList.add('hidden');
+    if (this.el.testEditorCard) this.el.testEditorCard.classList.remove('hidden');
+    this.switchTab('testscenarios', 'new', null, false);
+    if (this.el.testTitleInput) this.el.testTitleInput.focus();
+  }
+
+  async saveCurrentTestScenario() {
+    const title = this.el.testTitleInput.value.trim();
+    if (!title) return this.showToast('Scenario title is required', 'error');
+
+    const criteriaInputs = this.el.testCriteriaList.querySelectorAll('.policy-item');
+    const checklist = Array.from(criteriaInputs).map((row, idx) => ({
+      id: `c_${idx + 1}`,
+      goal: row.querySelector('.test-criteria-input')?.value.trim() || '',
+      required: row.querySelector('.test-criteria-req')?.checked !== false,
+    })).filter(c => c.goal.length > 0);
+
+    const payload = {
+      id: this.activeTestId,
+      title,
+      status: this.el.testStatusSelect.value,
+      max_turns: parseInt(this.el.testMaxTurnsInput.value, 10) || 6,
+      customer_role: this.el.testRoleInput.value.trim(),
+      test_objective: this.el.testObjectiveInput.value.trim(),
+      secret_instructions: this.el.testSecretInstructionsInput.value.trim(),
+      callee: {
+        role: this.el.testRoleInput.value.trim(),
+        secret_instructions: this.el.testSecretInstructionsInput.value.trim(),
+      },
+      linked_policies: this.activeTestLinkedPolicies,
+      linked_procedures: this.activeTestLinkedProcedures,
+      evaluation_checklist: checklist,
+    };
+
+    try {
+      const res = await fetch(`/api/accounts/${this.activeAccountId}/test-scenarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const saved = await res.json();
+      this.activeTestId = saved.id;
+      await this.loadTestScenarios(this.activeAccountId, this.testFilter, saved.id);
+      await this.loadCoverageGaps(this.activeAccountId);
+      this.showToast(`Test scenario [${saved.id}] saved!`);
+    } catch (e) {
+      this.showToast('Save scenario failed', 'error', e.message);
+    }
+  }
+
+  async deleteCurrentTestScenario() {
+    if (!this.activeTestId) return;
+    if (!confirm(`Delete test scenario ${this.activeTestId}?`)) return;
+    try {
+      await fetch(`/api/accounts/${this.activeAccountId}/test-scenarios/${this.activeTestId}`, { method: 'DELETE' });
+      this.activeTestId = null;
+      await this.loadTestScenarios(this.activeAccountId, this.testFilter);
+      await this.loadCoverageGaps(this.activeAccountId);
+      this.showToast('Test scenario deleted');
+    } catch (e) {
+      this.showToast('Delete scenario failed', 'error', e.message);
+    }
+  }
+
+  async suggestLinksForCurrentTest() {
+    try {
+      const title = this.el.testTitleInput.value.trim();
+      const description = this.el.testObjectiveInput.value.trim();
+      const instructions = this.el.testSecretInstructionsInput.value.trim();
+
+      const res = await fetch(`/api/accounts/${this.activeAccountId}/test-scenarios/suggest-links`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, instructions }),
+      });
+      const data = await res.json();
+
+      const suggestedPolicies = (data.suggested_policies || []).filter(p => !this.activeTestLinkedPolicies.includes(p.ref_id));
+      const suggestedProcedures = (data.suggested_procedures || []).filter(p => !this.activeTestLinkedProcedures.includes(p.ref_id));
+
+      if (suggestedPolicies.length === 0 && suggestedProcedures.length === 0) {
+        this.showToast('No new suggestions found', 'success', 'All matching items already linked or none detected.');
+        return;
+      }
+
+      this.el.testSuggestedLinksBox.classList.remove('hidden');
+      const polBadges = suggestedPolicies.map(p => `
+        <span class="suggested-pill-tag btn-add-suggested-link" data-type="policy" data-id="${p.ref_id}">
+          + 📜 ${p.ref_id}: ${p.title}
+        </span>
+      `).join('');
+      const procBadges = suggestedProcedures.map(p => `
+        <span class="suggested-pill-tag btn-add-suggested-link" data-type="procedure" data-id="${p.ref_id}">
+          + 📋 ${p.ref_id}: ${p.name}
+        </span>
+      `).join('');
+      this.el.testSuggestedLinksList.innerHTML = polBadges + procBadges;
+
+      this.el.testSuggestedLinksList.querySelectorAll('.btn-add-suggested-link').forEach(tag => {
+        tag.addEventListener('click', () => {
+          const type = tag.dataset.type;
+          const id = tag.dataset.id;
+          if (type === 'policy' && !this.activeTestLinkedPolicies.includes(id)) {
+            this.activeTestLinkedPolicies.push(id);
+          } else if (type === 'procedure' && !this.activeTestLinkedProcedures.includes(id)) {
+            this.activeTestLinkedProcedures.push(id);
+          }
+          tag.remove();
+          this.renderActiveTestLinks();
+          if (this.el.testSuggestedLinksList.children.length === 0) {
+            this.el.testSuggestedLinksBox.classList.add('hidden');
+          }
+        });
+      });
+
+      this.showToast(`Found ${suggestedPolicies.length + suggestedProcedures.length} suggested links!`);
+    } catch (e) {
+      this.showToast('Suggest links failed', 'error', e.message);
+    }
+  }
+
+  openAddLinkPickerModal() {
+    const unlinkedPolicies = (this.policies || []).filter(p => !this.activeTestLinkedPolicies.includes(p.ref_id || p.id));
+    const unlinkedProcedures = (this.procedures || []).filter(p => !this.activeTestLinkedProcedures.includes(p.ref_id || p.id));
+
+    if (unlinkedPolicies.length === 0 && unlinkedProcedures.length === 0) {
+      this.showToast('All policies and procedures already linked!', 'success');
+      return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'drawer-overlay';
+    modal.innerHTML = `
+      <div class="drawer-panel" style="max-width: 500px;">
+        <div class="drawer-header">
+          <h3>Link Policy or Procedure</h3>
+          <button class="btn-icon-soft btn-close-picker">✕</button>
+        </div>
+        <div class="flex-col gap-3">
+          ${unlinkedPolicies.length > 0 ? `
+            <div>
+              <strong class="text-xs text-dim block mb-1">📜 POLICIES</strong>
+              <div class="flex-col gap-1">
+                ${unlinkedPolicies.map(p => `
+                  <button class="btn-soft-xs text-left p-2 flex-between btn-select-link" data-type="policy" data-id="${p.ref_id || p.id}">
+                    <span><strong>[${p.ref_id || p.id}]</strong> ${p.title}</span>
+                    <span class="badge-mini">${p.type}</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${unlinkedProcedures.length > 0 ? `
+            <div>
+              <strong class="text-xs text-dim block mb-1">📋 PROCEDURES</strong>
+              <div class="flex-col gap-1">
+                ${unlinkedProcedures.map(p => `
+                  <button class="btn-soft-xs text-left p-2 flex-between btn-select-link" data-type="procedure" data-id="${p.ref_id || p.id}">
+                    <span><strong>[${p.ref_id || p.id}]</strong> ${p.name}</span>
+                    <span class="badge-mini">${p.status}</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.querySelector('.btn-close-picker').addEventListener('click', () => modal.remove());
+    modal.querySelectorAll('.btn-select-link').forEach(b => {
+      b.addEventListener('click', () => {
+        const type = b.dataset.type;
+        const id = b.dataset.id;
+        if (type === 'policy') this.activeTestLinkedPolicies.push(id);
+        if (type === 'procedure') this.activeTestLinkedProcedures.push(id);
+        this.renderActiveTestLinks();
+        modal.remove();
+        this.showToast(`Linked [${id}]`);
+      });
+    });
+  }
+
+  async generateGapDraftTests() {
+    try {
+      const res = await fetch(`/api/accounts/${this.activeAccountId}/test-scenarios/generate-gap-drafts`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      await this.loadTestScenarios(this.activeAccountId, 'draft');
+      await this.loadCoverageGaps(this.activeAccountId);
+      this.showToast(`Generated ${data.count} draft test scenarios for review!`, 'success');
+    } catch (e) {
+      this.showToast('Generate draft tests failed', 'error', e.message);
+    }
+  }
 
   openScenarioModalForNew() {
     this.activeEditingScenarioIndex = -1;
@@ -1608,7 +2154,7 @@ class TalkDojoEnterpriseApp {
       if (!activeAsst) return;
 
       this.el.editorHeading.textContent = `Edit Assistant: ${activeAsst.name}`;
-      this.el.editorSubheading.textContent = 'Update conversational guidelines, assigned tools, or voice timbre.';
+      this.el.editorSubheading.textContent = 'Update conversational guidelines or voice timbre.';
       this.el.editorAiCreatorBox.classList.add('hidden');
       this.el.btnEditorDeleteAsst.classList.remove('hidden');
 
@@ -1622,25 +2168,13 @@ class TalkDojoEnterpriseApp {
     this.el.asstPersonalityInput.value = asst.personality_style || '';
     this.el.asstBackstoryInput.value = asst.backstory || '';
 
-    // Tools checkboxes
-    const vtools = this.virtualTools || [];
-    this.el.asstToolsCheckboxes.innerHTML = vtools.map(t => `
-      <label class="tool-checkbox-item">
-        <input type="checkbox" value="${t.id}" ${asst.tools?.includes(t.id) || !asst.tools ? 'checked' : ''}>
-        <span>🛠️ ${t.name}</span>
-      </label>
-    `).join('');
-
     this.renderAssistantRulesList(asst.conversational_rules || [
       'Speak with gentle warmth and polite courtesy.',
       'Remain calm and attentive when callers are stressed.',
     ]);
 
     // Populate scenario selector for embedded chat
-    const allScens = [];
-    this.procedures.forEach(p => {
-      (p.test_scenarios || []).forEach(s => allScens.push(s));
-    });
+    const allScens = this.testScenarios || [];
     this.el.chatScenarioSelect.innerHTML = allScens.map(s => `<option value="${s.id}">${s.title}</option>`).join('');
 
     this.adjustAllAutoGrow();
@@ -1662,14 +2196,15 @@ class TalkDojoEnterpriseApp {
   addAssistantRuleRow() {
     const div = document.createElement('div');
     div.className = 'policy-item';
+    const count = this.el.asstRulesList.children.length + 1;
     div.innerHTML = `
-      <span class="policy-num">#${this.el.asstRulesList.children.length + 1}</span>
-      <input type="text" placeholder="Enter conversational guideline..." class="asst-rule-input">
+      <span class="policy-num">#${count}</span>
+      <input type="text" placeholder="Guideline rule..." class="asst-rule-input">
       <button class="btn-icon-soft btn-del-asst-rule">✕</button>
     `;
     div.querySelector('.btn-del-asst-rule').addEventListener('click', () => div.remove());
     this.el.asstRulesList.appendChild(div);
-    div.querySelector('input').focus();
+    div.querySelector('.asst-rule-input').focus();
   }
 
   async runAiDescribeAssistant() {
@@ -1712,7 +2247,6 @@ class TalkDojoEnterpriseApp {
       this.el.voicePreviewAudio.onerror = () => {
         this.el.btnPreviewVoice.disabled = false;
         this.el.btnPreviewVoice.textContent = '🔊 Preview Voice (10s)';
-        this.showToast('Voice preview audio error', 'error');
       };
     } catch (e) {
       this.el.btnPreviewVoice.disabled = false;
@@ -1725,7 +2259,6 @@ class TalkDojoEnterpriseApp {
     const name = this.el.asstNameInput.value.trim();
     if (!name) return this.showToast('Assistant name is required', 'error');
 
-    const tools = Array.from(this.el.asstToolsCheckboxes.querySelectorAll('input:checked')).map(i => i.value);
     const rules = Array.from(this.el.asstRulesList.querySelectorAll('.asst-rule-input')).map(i => i.value.trim()).filter(Boolean);
 
     const isNew = this.activeSub === 'new';
@@ -1737,7 +2270,6 @@ class TalkDojoEnterpriseApp {
       voice: this.el.asstVoiceSelect.value,
       personality_style: this.el.asstPersonalityInput.value.trim(),
       backstory: this.el.asstBackstoryInput.value.trim(),
-      tools,
       conversational_rules: rules,
     };
 

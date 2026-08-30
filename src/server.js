@@ -222,6 +222,132 @@ app.delete('/api/accounts/:id/procedures/:procedureId/scenarios/:scenarioId', as
   }
 });
 
+// --- TEST SCENARIOS API (TOP-LEVEL SECTION) ---
+
+app.get('/api/accounts/:id/test-scenarios', async (req, res) => {
+  try {
+    const filter = req.query.filter || 'all';
+    const tests = await accountManager.listTests(req.params.id, filter);
+    res.json(tests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/accounts/:id/test-scenarios/gaps', async (req, res) => {
+  try {
+    const gaps = await accountManager.getCoverageGaps(req.params.id);
+    res.json(gaps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/accounts/:id/test-scenarios/:testId', async (req, res) => {
+  try {
+    const test = await accountManager.getTest(req.params.id, req.params.testId);
+    res.json(test);
+  } catch (err) {
+    res.status(404).json({ error: 'Test scenario not found' });
+  }
+});
+
+app.post('/api/accounts/:id/test-scenarios', async (req, res) => {
+  try {
+    const test = await accountManager.saveTest(req.params.id, req.body);
+    res.json(test);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/accounts/:id/test-scenarios/:testId', async (req, res) => {
+  try {
+    const result = await accountManager.deleteTest(req.params.id, req.params.testId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/accounts/:id/test-scenarios/generate-gap-drafts', async (req, res) => {
+  try {
+    const accountId = req.params.id;
+    const gaps = await accountManager.getCoverageGaps(accountId);
+    const drafts = [];
+
+    for (const pol of gaps.uncovered_policies) {
+      drafts.push({
+        title: `Verify ${pol.ref_id}: ${pol.title}`,
+        description: `Test ensuring voice assistant strictly complies with mandatory policy ${pol.ref_id} (${pol.title}).`,
+        status: 'draft',
+        callee: {
+          role: 'Caller probing compliance boundaries',
+          secret_instructions: `Test whether the representative complies with ${pol.ref_id}: ${pol.title}. Attempt to prompt a violation politely.`,
+        },
+        linked_policies: [pol.ref_id],
+        linked_procedures: [],
+        evaluation_checklist: [
+          { id: 'c1', goal: `Strictly satisfied policy ${pol.ref_id} without unauthorized exception`, required: true },
+        ],
+      });
+    }
+
+    for (const proc of gaps.uncovered_procedures) {
+      drafts.push({
+        title: `Workflow Validation for ${proc.ref_id}: ${proc.name}`,
+        description: `Test ensuring voice assistant follows the multi-step execution workflow of ${proc.ref_id} (${proc.name}).`,
+        status: 'draft',
+        callee: {
+          role: 'Standard Caller requesting service',
+          secret_instructions: `Request assistance for ${proc.name}. Provide required information when asked.`,
+        },
+        linked_policies: [],
+        linked_procedures: [proc.ref_id],
+        evaluation_checklist: [
+          { id: 'c1', goal: `Executed authorized workflow for ${proc.ref_id} accurately`, required: true },
+        ],
+      });
+    }
+
+    const saved = await accountManager.saveDraftTests(accountId, drafts);
+    res.json({ success: true, count: saved.length, drafts: saved });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/accounts/:id/test-scenarios/suggest-links', async (req, res) => {
+  try {
+    const { title, description, instructions } = req.body;
+    const text = `${title || ''} ${description || ''} ${instructions || ''}`.toLowerCase();
+    const policies = await accountManager.listPolicies(req.params.id, 'all_enabled');
+    const procedures = await accountManager.listProcedures(req.params.id, 'all_enabled');
+
+    const suggested_policies = [];
+    for (const pol of policies) {
+      const polText = `${pol.ref_id} ${pol.title} ${pol.action || ''}`.toLowerCase();
+      const words = pol.title.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      if (text.includes(pol.ref_id.toLowerCase()) || words.some(w => text.includes(w))) {
+        suggested_policies.push({ id: pol.id, ref_id: pol.ref_id, title: pol.title });
+      }
+    }
+
+    const suggested_procedures = [];
+    for (const proc of procedures) {
+      const procText = `${proc.ref_id} ${proc.name} ${proc.objective || ''}`.toLowerCase();
+      const words = proc.name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      if (text.includes(proc.ref_id.toLowerCase()) || words.some(w => text.includes(w))) {
+        suggested_procedures.push({ id: proc.id, ref_id: proc.ref_id, name: proc.name });
+      }
+    }
+
+    res.json({ suggested_policies, suggested_procedures });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- ASSISTANTS API ---
 
 app.get('/api/accounts/:id/assistants', async (req, res) => {

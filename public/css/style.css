@@ -1063,3 +1063,207 @@ select option {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Coverage Gap & Warning Indicators */
+.badge-warning-dot {
+  background: #ffab00;
+  color: #0d1117;
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 700;
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 171, 0, 0); }
+  50% { transform: scale(1.08); box-shadow: 0 0 10px rgba(255, 171, 0, 0.6); }
+}
+
+.warning-callout {
+  background: rgba(255, 171, 0, 0.08);
+  border: 1px solid rgba(255, 171, 0, 0.3);
+  border-left: 4px solid #ffab00;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: #ffc947;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.coverage-gap-banner {
+  background: linear-gradient(135deg, rgba(255, 171, 0, 0.12), rgba(255, 99, 71, 0.08));
+  border: 1px solid rgba(255, 171, 0, 0.35);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.coverage-gap-banner .gap-icon {
+  font-size: 1.5rem;
+}
+
+.coverage-gap-banner .gap-content {
+  flex: 1;
+}
+
+.coverage-gap-banner h4 {
+  font-size: 0.95rem;
+  color: #ffab00;
+  margin-bottom: 4px;
+}
+
+.coverage-gap-banner p {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.gap-list-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Tool Accordions for Procedures */
+.tool-accordion {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.tool-accordion-header {
+  padding: 9px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  user-select: none;
+}
+
+.tool-accordion-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tool-accordion-body {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-subtle);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.action-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.15s ease;
+}
+
+.action-check-item:hover {
+  border-color: var(--cyan);
+  background: rgba(0, 210, 255, 0.04);
+}
+
+.action-check-item input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: var(--cyan);
+}
+
+/* Linking Badges & Cards */
+.linked-badges-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.linked-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 210, 255, 0.12);
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  color: #00d2ff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.linked-pill-tag:hover {
+  background: rgba(0, 210, 255, 0.2);
+}
+
+.linked-pill-tag.pill-pol {
+  background: rgba(255, 171, 0, 0.12);
+  border-color: rgba(255, 171, 0, 0.35);
+  color: #ffab00;
+}
+
+.linked-pill-tag.pill-pol:hover {
+  background: rgba(255, 171, 0, 0.2);
+}
+
+.linked-pill-tag.pill-proc {
+  background: rgba(0, 230, 153, 0.12);
+  border-color: rgba(0, 230, 153, 0.35);
+  color: #00e699;
+}
+
+.linked-pill-tag.pill-proc:hover {
+  background: rgba(0, 230, 153, 0.2);
+}
+
+.linked-pill-tag .pill-remove {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.linked-pill-tag .pill-remove:hover {
+  color: #ff5252;
+}
+
+.suggested-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  color: var(--text-dim);
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.suggested-pill-tag:hover {
+  background: rgba(0, 210, 255, 0.15);
+  border-color: var(--cyan);
+  color: #fff;
+}
+
+

@@ -79,7 +79,25 @@
           </div>
         </div>
 
-        <!-- 5. 🤖 Assistants -->
+        <!-- 5. 🏦 Test Scenarios (Compliance & Workflow Test Banks) -->
+        <div class="nav-tree-group" id="nav-group-testscenarios">
+          <button class="nav-item nav-tree-header" data-tab="testscenarios" data-sub="all" title="Test Scenarios & Coverage">
+            <span class="nav-icon">🏦</span>
+            <span class="nav-label">Test Scenarios</span>
+            <span id="nav-badge-scenarios-warning" class="badge-warning-dot hidden" title="Coverage Gaps Detected">⚠️</span>
+            <span id="nav-badge-testscenarios" class="nav-count">0</span>
+            <span class="tree-arrow">▾</span>
+          </button>
+          <div class="nav-sub-tree">
+            <button class="nav-sub-item active" data-tab="testscenarios" data-sub="all">All Scenarios</button>
+            <button class="nav-sub-item" data-tab="testscenarios" data-sub="enabled">Enabled</button>
+            <button class="nav-sub-item" data-tab="testscenarios" data-sub="drafts">Drafts <span id="nav-badge-test-drafts" class="badge-mini">0</span></button>
+            <button class="nav-sub-item" data-tab="testscenarios" data-sub="gaps">Coverage Gaps <span id="nav-badge-gaps-count" class="badge-mini badge-warn">0</span></button>
+            <button class="nav-sub-item" data-tab="testscenarios" data-sub="new">+ New Scenario</button>
+          </div>
+        </div>
+
+        <!-- 6. 🤖 Assistants -->
         <div class="nav-tree-group" id="nav-group-assistants">
           <button class="nav-item nav-tree-header" data-tab="assistants" data-sub="all" title="Virtual Assistants">
             <span class="nav-icon">🤖</span>
@@ -382,6 +400,12 @@
                   </div>
                 </div>
 
+                <!-- Coverage Gap Warning -->
+                <div id="policy-uncovered-warning" class="warning-callout mb-3 hidden">
+                  <span>⚠️ <strong>No test scenario currently covers this policy.</strong></span>
+                  <button id="btn-policy-create-test" class="btn-soft-xs text-amber font-bold">⚡ Generate Test Scenario</button>
+                </div>
+
                 <div class="form-group">
                   <label for="policy-title-input">Policy Title / Summary</label>
                   <input type="text" id="policy-title-input" class="input-soft" placeholder="e.g. HIPAA Two-Factor Identity Verification">
@@ -487,6 +511,12 @@
                   </div>
                 </div>
 
+                <!-- Coverage Gap Warning -->
+                <div id="proc-uncovered-warning" class="warning-callout mb-3 hidden">
+                  <span>⚠️ <strong>No test scenario currently covers this procedure.</strong></span>
+                  <button id="btn-proc-create-test" class="btn-soft-xs text-amber font-bold">⚡ Generate Test Scenario</button>
+                </div>
+
                 <div class="form-grid-2">
                   <div class="form-group">
                     <label for="proc-name-input">Procedure Name</label>
@@ -508,8 +538,8 @@
                 </div>
 
                 <div class="form-group">
-                  <label><strong>Authorized Tools for this Procedure</strong> (Constrains what tools assistant may call)</label>
-                  <div id="proc-tools-checkboxes" class="tools-checkbox-grid mt-1"></div>
+                  <label><strong>Authorized Tools & Granular Actions</strong> (Select specific permitted tool endpoints for this procedure)</label>
+                  <div id="proc-tools-checkboxes" class="mt-2"></div>
                 </div>
 
                 <div class="form-group">
@@ -522,16 +552,18 @@
                   <textarea id="proc-constraints-input" class="textarea-soft auto-grow" rows="2" placeholder="e.g. Only schedule within Mon-Fri 8 AM - 5 PM. Minimum 24 hours advance notice."></textarea>
                 </div>
 
-                <!-- Integrated Test Scenarios Section -->
-                <div class="proc-scenarios-box">
+                <!-- Test Coverage Box -->
+                <div class="card p-3 mt-3" style="background: rgba(255,255,255,0.02); border-color: var(--border-subtle);">
                   <div class="flex-between mb-2">
                     <div>
-                      <strong>Linked Test Scenarios</strong>
-                      <span class="text-xs text-muted block">Every enabled procedure must have at least 1 test scenario</span>
+                      <strong class="text-xs">Covering Test Scenarios</strong>
+                      <span class="text-xs text-muted block">Tests that validate this procedure workflow</span>
                     </div>
-                    <button id="btn-proc-add-scenario" class="btn-soft-xs">+ Add Test Scenario</button>
+                    <button id="btn-proc-goto-tests" class="btn-soft-xs text-cyan">Manage in Test Scenarios ↗</button>
                   </div>
-                  <div id="proc-scenarios-list"></div>
+                  <div id="proc-tests-coverage-list" class="linked-badges-wrap">
+                    <span class="text-xs text-dim">No covering tests yet.</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -539,7 +571,161 @@
         </section>
 
         <!-- ============================================================ -->
-        <!-- TAB 5: 🤖 ASSISTANTS (MASTER-DETAIL + EMBEDDED CHAT)         -->
+        <!-- TAB 5: 🏦 TEST SCENARIOS (STANDALONE SUITE & COVERAGE)       -->
+        <!-- ============================================================ -->
+        <section id="pane-testscenarios" class="tab-pane hidden">
+          <div class="pane-header">
+            <div>
+              <h2>🏦 Test Scenarios & Coverage</h2>
+              <p class="text-muted text-xs">Manage standardized customer roleplay scenarios linked to policies and procedures. Verify your assistants follow business rules.</p>
+            </div>
+            <div class="flex-center gap-2">
+              <button id="btn-tests-gap-draft" class="btn-soft-xs text-amber font-bold hidden">⚡ Generate Draft Tests for Gaps</button>
+              <button id="btn-testscenarios-nav-new" class="btn-primary-cyan">+ New Scenario</button>
+            </div>
+          </div>
+
+          <!-- Coverage Gap Alert Banner -->
+          <div id="testscenarios-gap-banner" class="coverage-gap-banner hidden">
+            <span class="gap-icon">⚠️</span>
+            <div class="gap-content">
+              <div class="flex-between">
+                <h4>Coverage Gaps Detected (<span id="gap-banner-count">0</span> Uncovered Items)</h4>
+                <button id="btn-banner-create-gap-drafts" class="btn-soft-xs text-amber font-bold">⚡ Create Draft Tests</button>
+              </div>
+              <p>Every enabled policy and procedure should have at least one test scenario to guarantee compliance and workflow adherence before live deployment.</p>
+              <div id="gap-banner-pills" class="gap-list-pills"></div>
+            </div>
+          </div>
+
+          <!-- Guidance Callout Banner -->
+          <div class="guidance-banner">
+            <span class="guidance-icon">💡</span>
+            <div class="guidance-content">
+              <h4>Multi-Target Scenario Testing</h4>
+              <p>Test scenarios simulate real caller dialogues with specific customer personas and secret objectives. Each scenario links to <strong>Policies</strong> (to verify guardrails) and/or <strong>Procedures</strong> (to verify workflow execution). Certification runs all enabled scenarios to benchmark your assistants.</p>
+            </div>
+          </div>
+
+          <!-- Filter Pills -->
+          <div class="flex-gap-2 mb-3">
+            <button class="btn-soft-xs test-filter-btn active" data-filter="all">All Scenarios</button>
+            <button class="btn-soft-xs test-filter-btn" data-filter="enabled">Enabled</button>
+            <button class="btn-soft-xs test-filter-btn" data-filter="draft">Drafts <span id="filter-badge-test-drafts" class="badge-mini">0</span></button>
+            <button class="btn-soft-xs test-filter-btn" data-filter="gaps">Coverage Gaps <span id="filter-badge-test-gaps" class="badge-mini badge-warn">0</span></button>
+          </div>
+
+          <div class="master-detail-grid">
+            <!-- Left Master: Scenarios List -->
+            <div class="master-col">
+              <div class="card p-3">
+                <div class="flex-between mb-3">
+                  <span class="text-xs font-bold text-dim">SCENARIOS (<span id="tests-master-count">0</span>)</span>
+                  <button id="btn-master-add-test" class="btn-soft-xs">+ Add</button>
+                </div>
+                <div id="tests-master-list" class="assistants-master-list"></div>
+              </div>
+            </div>
+
+            <!-- Right Detail: Scenario Editor -->
+            <div class="detail-col">
+              <div id="tests-zero-state" class="empty-card hidden">
+                <div class="empty-icon">🏦</div>
+                <h3>No test scenarios found.</h3>
+                <p class="text-muted text-xs">Create test scenarios to evaluate policy compliance and procedure execution.</p>
+                <button id="btn-empty-start-test" class="btn-primary-cyan mt-3">+ Create First Scenario</button>
+              </div>
+
+              <div id="test-editor-card" class="card">
+                <div class="flex-between mb-3 border-b pb-2">
+                  <div class="flex-center gap-2">
+                    <span id="test-ref-id-badge" class="ref-badge ref-badge-proc">TEST-001</span>
+                    <div>
+                      <h3 id="test-editor-title">Edit Test Scenario</h3>
+                      <span id="test-editor-sub" class="text-xs text-muted">Configure customer role, secret instructions, and checklist</span>
+                    </div>
+                  </div>
+                  <div class="flex-center gap-2">
+                    <button id="btn-test-delete" class="btn-danger-soft">🗑️ Delete</button>
+                    <button id="btn-test-save" class="btn-primary-cyan">Save Scenario</button>
+                  </div>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label for="test-title-input">Scenario Title</label>
+                    <input type="text" id="test-title-input" class="input-soft" placeholder="e.g. Schedule Thursday Follow-up Appointment">
+                  </div>
+                  <div class="form-group">
+                    <label for="test-status-select">Status</label>
+                    <select id="test-status-select" class="select-soft">
+                      <option value="enabled">Enabled (Active for Certification)</option>
+                      <option value="draft">Draft (In Review / Staging)</option>
+                      <option value="disabled">Disabled (Inactive)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Linked Policies & Procedures Card -->
+                <div class="card p-3 mb-3" style="background: rgba(255,255,255,0.02); border-color: var(--border-subtle);">
+                  <div class="flex-between mb-2">
+                    <div>
+                      <strong class="text-xs">Linked Policies & Procedures</strong>
+                      <span class="text-xs text-muted block">This scenario tests and enforces compliance with these items</span>
+                    </div>
+                    <div class="flex-center gap-2">
+                      <button id="btn-test-suggest-links" class="btn-soft-xs text-cyan">✨ AI Suggest Links</button>
+                      <button id="btn-test-add-link-picker" class="btn-soft-xs">+ Link Item</button>
+                    </div>
+                  </div>
+
+                  <!-- Active Linked Badges -->
+                  <div id="test-active-links-list" class="linked-badges-wrap mb-2">
+                    <span class="text-xs text-dim">No policies or procedures linked yet.</span>
+                  </div>
+
+                  <!-- Suggested Links Row -->
+                  <div id="test-suggested-links-box" class="hidden">
+                    <span class="text-xs text-cyan font-bold block mb-1">✨ Suggested Matches:</span>
+                    <div id="test-suggested-links-list" class="linked-badges-wrap"></div>
+                  </div>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label for="test-role-input">Customer Role / Persona</label>
+                    <input type="text" id="test-role-input" class="input-soft" placeholder="e.g. Patient John Smith looking for a checkup">
+                  </div>
+                  <div class="form-group">
+                    <label for="test-max-turns-input">Max Dialog Turns</label>
+                    <input type="number" id="test-max-turns-input" class="input-soft" min="2" max="20" value="6">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="test-objective-input">Test Objective</label>
+                  <input type="text" id="test-objective-input" class="input-soft" placeholder="e.g. Verify identity, inquire for Thursday slots, and book 2:00 PM">
+                </div>
+
+                <div class="form-group">
+                  <label for="test-secret-instructions-input">Secret Caller Instructions (Simulated Customer behavior)</label>
+                  <textarea id="test-secret-instructions-input" class="textarea-soft auto-grow" rows="3" placeholder="You are John Smith, DOB March 14, 1980. You need a Thursday afternoon checkup. Book 2:00 PM if offered."></textarea>
+                </div>
+
+                <div class="form-group">
+                  <div class="flex-between mb-1">
+                    <label><strong>Referee Evaluation Criteria Checklist</strong></label>
+                    <button id="btn-test-add-criteria" class="btn-soft-xs">+ Add Criteria</button>
+                  </div>
+                  <div id="test-criteria-list" class="flex-col gap-2"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- TAB 6: 🤖 ASSISTANTS (MASTER-DETAIL + EMBEDDED CHAT)         -->
         <!-- ============================================================ -->
         <section id="pane-assistants" class="tab-pane">
           <div class="pane-header">
@@ -639,11 +825,6 @@
                 <div class="form-group">
                   <label for="asst-backstory-input">Backstory & Authentic Context</label>
                   <textarea id="asst-backstory-input" class="textarea-soft auto-grow" rows="3" placeholder="Describe the assistant's background and authentic context..."></textarea>
-                </div>
-
-                <div class="form-group">
-                  <label><strong>Assigned Tools</strong></label>
-                  <div id="asst-tools-checkboxes" class="tools-checkbox-grid"></div>
                 </div>
 
                 <div class="form-group">

@@ -18,7 +18,7 @@ export class AccountManager {
   async init() {
     await fs.mkdir(this.baseDir, { recursive: true });
     await this.migrateLegacyAccounts();
-    await this.initDefaultSeedAccount();
+    await this.initDefaultSeedAccounts();
   }
 
   // --- GUID GENERATOR & MIGRATION ---
@@ -445,6 +445,10 @@ Address: Headquarters & Central Dispatch, Suite 100.
       id = `PROC-${String(nextNum).padStart(3, '0')}`;
     }
 
+    const authorized_actions = Array.isArray(procedureData.authorized_actions)
+      ? procedureData.authorized_actions
+      : (Array.isArray(procedureData.authorized_tools) ? procedureData.authorized_tools : []);
+
     const payload = {
       id,
       ref_id: id,
@@ -452,6 +456,7 @@ Address: Headquarters & Central Dispatch, Suite 100.
       status: ['enabled', 'draft', 'disabled'].includes(procedureData.status) ? procedureData.status : 'enabled',
       objective: procedureData.objective || '',
       authorized_tools: Array.isArray(procedureData.authorized_tools) ? procedureData.authorized_tools : [],
+      authorized_actions,
       steps: Array.isArray(procedureData.steps) ? procedureData.steps : (procedureData.steps ? [procedureData.steps] : []),
       constraints: procedureData.constraints || '',
       test_scenarios: Array.isArray(procedureData.test_scenarios) ? procedureData.test_scenarios : [],
@@ -533,6 +538,190 @@ Address: Headquarters & Central Dispatch, Suite 100.
     procedure.test_scenarios = procedure.test_scenarios.filter(s => s.id !== scenarioId);
     await this.saveProcedure(accountId, procedure);
     return { success: true };
+  }
+
+  // --- TEST SCENARIOS CRUD (TOP-LEVEL SECTION) ---
+
+  async listTests(accountId, filter = null) {
+    const dir = path.join(this.baseDir, accountId, 'test-scenarios');
+    try {
+      await fs.mkdir(dir, { recursive: true });
+      const files = await fs.readdir(dir);
+      const yamlFiles = files.filter(f => f.endsWith('.yaml') || f.endsWith('.yml'));
+
+      const tests = [];
+      for (const f of yamlFiles) {
+        try {
+          const raw = await fs.readFile(path.join(dir, f), 'utf8');
+          const data = yaml.parse(raw);
+          data.id = data.id || path.basename(f, path.extname(f));
+          tests.push(this.normalizeTestScenario(data));
+        } catch (e) {}
+      }
+
+      tests.sort((a, b) => (a.ref_id || a.id).localeCompare(b.ref_id || b.id));
+
+      if (!filter || filter === 'all') return tests;
+      if (filter === 'enabled') return tests.filter(t => t.status === 'enabled');
+      if (filter === 'draft' || filter === 'drafts') return tests.filter(t => t.status === 'draft');
+      if (filter === 'disabled') return tests.filter(t => t.status === 'disabled');
+
+      return tests;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  normalizeTestScenario(data) {
+    if (!data) return data;
+    const role = data.callee?.role || data.customer_role || 'Customer';
+    const instructions = data.callee?.secret_instructions || data.secret_instructions || '';
+    const desc = data.description || data.test_objective || '';
+
+    let checklist = [];
+    if (Array.isArray(data.evaluation_checklist) && data.evaluation_checklist.length > 0) {
+      checklist = data.evaluation_checklist;
+    } else if (Array.isArray(data.checklist) && data.checklist.length > 0) {
+      checklist = data.checklist.map((c, ci) => ({ id: `c_${ci+1}`, goal: typeof c === 'string' ? c : (c.goal || ''), required: true }));
+    }
+
+    return {
+      id: data.id,
+      ref_id: data.ref_id || data.id,
+      title: data.title || 'Untitled Test Scenario',
+      description: desc,
+      test_objective: desc,
+      status: ['enabled', 'draft', 'disabled'].includes(data.status) ? data.status : 'enabled',
+      max_turns: data.max_turns || 6,
+      customer_role: role,
+      secret_instructions: instructions,
+      callee: {
+        role,
+        secret_instructions: instructions,
+      },
+      linked_policies: Array.isArray(data.linked_policies) ? data.linked_policies : [],
+      linked_procedures: Array.isArray(data.linked_procedures) ? data.linked_procedures : [],
+      checklist: checklist.map(c => typeof c === 'string' ? c : (c.goal || '')),
+      evaluation_checklist: checklist,
+      created_at: data.created_at || new Date().toISOString(),
+      updated_at: data.updated_at || new Date().toISOString(),
+    };
+  }
+
+  async getTest(accountId, testId) {
+    const file = path.join(this.baseDir, accountId, 'test-scenarios', `${testId}.yaml`);
+    try {
+      const raw = await fs.readFile(file, 'utf8');
+      const data = yaml.parse(raw);
+      data.id = testId;
+      return this.normalizeTestScenario(data);
+    } catch (e) {
+      const tests = await this.listTests(accountId);
+      const found = tests.find(t => t.id === testId || t.ref_id === testId);
+      if (found) return found;
+      throw e;
+    }
+  }
+
+  async saveTest(accountId, testData) {
+    const dir = path.join(this.baseDir, accountId, 'test-scenarios');
+    await fs.mkdir(dir, { recursive: true });
+
+    let id = testData.id;
+    if (!id || id === 'TEST-NEW' || id === 'test-new') {
+      const existing = await this.listTests(accountId);
+      const nextNum = existing.length + 1;
+      id = `TEST-${String(nextNum).padStart(3, '0')}`;
+    }
+
+    const normalized = this.normalizeTestScenario({
+      ...testData,
+      id,
+      ref_id: testData.ref_id || id,
+      updated_at: new Date().toISOString(),
+    });
+
+    await fs.writeFile(path.join(dir, `${id}.yaml`), yaml.stringify(normalized), 'utf8');
+    return normalized;
+  }
+
+  async deleteTest(accountId, testId) {
+    const file = path.join(this.baseDir, accountId, 'test-scenarios', `${testId}.yaml`);
+    const raw = await fs.readFile(file, 'utf8');
+    const data = yaml.parse(raw);
+
+    await this.addToRecycleBin(accountId, {
+      id: testId,
+      type: 'test',
+      name: data.title || testId,
+      originalPath: `test-scenarios/${testId}.yaml`,
+      data,
+    });
+
+    await fs.unlink(file);
+    return { success: true, movedToRecycleBin: true };
+  }
+
+  async saveDraftTests(accountId, drafts = []) {
+    const saved = [];
+    for (const draft of drafts) {
+      const test = await this.saveTest(accountId, {
+        ...draft,
+        status: 'draft',
+      });
+      saved.push(test);
+    }
+    return saved;
+  }
+
+  async getCoverageGaps(accountId) {
+    const policies = await this.listPolicies(accountId, 'all_enabled');
+    const procedures = await this.listProcedures(accountId, 'all_enabled');
+    const tests = await this.listTests(accountId, 'enabled');
+
+    const uncovered_policies = [];
+    for (const pol of policies) {
+      const polKey = pol.ref_id || pol.id;
+      const isCovered = tests.some(t =>
+        (t.linked_policies || []).includes(polKey) ||
+        (t.linked_policies || []).includes(pol.id) ||
+        (t.linked_policies || []).includes(pol.ref_id)
+      );
+      if (!isCovered) {
+        uncovered_policies.push({
+          id: pol.id,
+          ref_id: pol.ref_id || pol.id,
+          title: pol.title,
+          type: pol.type,
+        });
+      }
+    }
+
+    const uncovered_procedures = [];
+    for (const proc of procedures) {
+      const procKey = proc.ref_id || proc.id;
+      const isCovered = tests.some(t =>
+        (t.linked_procedures || []).includes(procKey) ||
+        (t.linked_procedures || []).includes(proc.id) ||
+        (t.linked_procedures || []).includes(proc.ref_id)
+      );
+      if (!isCovered) {
+        uncovered_procedures.push({
+          id: proc.id,
+          ref_id: proc.ref_id || proc.id,
+          name: proc.name,
+          status: proc.status,
+        });
+      }
+    }
+
+    const total_gaps = uncovered_policies.length + uncovered_procedures.length;
+    return {
+      uncovered_policies,
+      uncovered_procedures,
+      total_gaps,
+      has_gaps: total_gaps > 0,
+    };
   }
 
   // --- ASSISTANTS CRUD ---
@@ -769,32 +958,65 @@ ${toolsDetails}
 
   // --- SEED DEFAULT ACCOUNT (SMOKY MOUNTAIN HEALTH) ---
 
-  async initDefaultSeedAccount() {
+  // --- SEED REALISTIC ENTERPRISE ACCOUNTS (MEDICAL, LAW, REAL ESTATE) ---
+
+  async initDefaultSeedAccounts() {
     const accounts = await this.listAccounts();
-    if (accounts.length > 0) {
-      // Seed policies & procedures for first account if missing
-      const firstAcc = accounts[0];
-      await this.ensureSeedPoliciesAndProcedures(firstAcc.id);
-      return;
+    const existingIds = new Set(accounts.map(a => a.id));
+
+    // 1. Medical Provider
+    const medId = accounts.find(a => a.id.startsWith('acct-smk') || a.id.startsWith('acct-med'))?.id || 'acct-med-smoky-mtn';
+    if (!existingIds.has(medId)) {
+      await this.seedMedicalAccount(medId);
+    } else {
+      await this.ensureSeedDataForMedical(medId);
     }
 
-    const accountId = 'acct-smk-7b9e2f41';
-    await this.saveAccount({
-      id: accountId,
-      name: 'Smoky Mountain Family Medicine',
-    });
+    // 2. Law Firm
+    const lawId = 'acct-law-sterling';
+    if (!existingIds.has(lawId)) {
+      await this.seedLawAccount(lawId);
+    }
 
-    await this.ensureSeedPoliciesAndProcedures(accountId);
+    // 3. Real Estate Firm
+    const realId = 'acct-real-vanguard';
+    if (!existingIds.has(realId)) {
+      await this.seedRealEstateAccount(realId);
+    }
   }
 
-  async ensureSeedPoliciesAndProcedures(accountId) {
+  async seedMedicalAccount(accountId) {
+    await this.saveAccount({
+      id: accountId,
+      name: 'Smoky Mountain Health & Urgent Care',
+      company_info_markdown: `## Pronunciation & Phonetics
+Pronounce "Smoky Mountain Health" ('SMOH-kee MOWN-tin'). Speak with a calm, welcoming, and reassuring Southern cadence.
+
+## Alternate Names & Acronyms
+Callers may refer to the clinic as Smoky Mountain Health, Smoky Mountain Clinic, Dr. Henderson's office, or urgent care dispatch.
+
+## Hours & Locations
+Main Clinic: 1042 Foothills Parkway, Suite 100, Knoxville, TN 37920.
+Hours: Monday – Friday, 8:00 AM – 6:00 PM; Saturday, 9:00 AM – 1:00 PM (Eastern Time).
+
+## Emergency & Triage Directives
+If a caller mentions acute chest pain, shortness of breath, severe head trauma, or profuse bleeding, instruct them to hang up and call 911 immediately.
+
+## Slogans & Core Mission
+"Dedicated to compassionate healing in the heart of East Tennessee." Prompt, courteous, and accurate care for every patient.`,
+    });
+
+    await this.ensureSeedDataForMedical(accountId);
+  }
+
+  async ensureSeedDataForMedical(accountId) {
     const policies = await this.listPolicies(accountId);
     if (policies.length === 0) {
       await this.savePolicy(accountId, {
         ref_id: 'POL-001',
         title: 'HIPAA Two-Factor Identity Verification',
         type: 'always',
-        action: 'Always verify the caller with two distinct identifiers (Full Legal Name and Date of Birth) before discussing appointments, test results, or medical records.',
+        action: 'Always verify caller identity using two distinct identifiers (Full Legal Name and Date of Birth) before discussing medical records, test results, or chart appointments.',
         status: 'enabled',
       });
       await this.savePolicy(accountId, {
@@ -812,53 +1034,13 @@ ${toolsDetails}
         action: 'Immediately advise caller to hang up and dial 911 without delay.',
         status: 'enabled',
       });
-    }
-
-    const procedures = await this.listProcedures(accountId);
-    if (procedures.length === 0) {
-      await this.saveProcedure(accountId, {
-        ref_id: 'PROC-001',
-        name: 'Clinic Appointment Scheduling & Rescheduling',
+      await this.savePolicy(accountId, {
+        ref_id: 'POL-004',
+        title: 'Sliding-Scale Hardship Fee Assistance',
+        type: 'conditional',
+        condition: 'Caller expresses inability to pay standard clinic copay due to documented financial hardship',
+        action: 'Apply sliding-scale community fee discount schedule.',
         status: 'enabled',
-        objective: 'Assist established and new patients with booking, confirming, or rescheduling clinic visits.',
-        authorized_tools: ['check_clinic_slots', 'book_clinic_appointment'],
-        steps: [
-          'Verify patient identity per policy POL-001.',
-          'Inquire regarding preferred provider, date range, and reason for visit.',
-          'Execute check_clinic_slots tool to find open openings.',
-          'Offer available appointment times and confirm patient choice.',
-          'Execute book_clinic_appointment tool and provide confirmation details.',
-        ],
-        constraints: 'Only schedule appointments within normal operating hours (Mon-Fri 8 AM - 5 PM). Minimum 24 hours advance notice.',
-        test_scenarios: [
-          {
-            id: 'scen-sched-01',
-            title: 'Schedule Thursday Follow-up Appointment',
-            customer_role: 'Patient John Smith looking for a Thursday appointment',
-            test_objective: 'Verify identity, lookup Thursday slots, book 2:00 PM, and recite instructions',
-            secret_instructions: 'You are John Smith, DOB March 14, 1980. You need a Thursday afternoon checkup.',
-            checklist: [
-              'Verified caller full name and date of birth',
-              'Checked Thursday appointment availability via tool',
-              'Confirmed 2:00 PM appointment slot',
-            ],
-          },
-        ],
-      });
-    }
-
-    const assistants = await this.listAssistants(accountId);
-    if (assistants.length === 0) {
-      await this.saveAssistant(accountId, {
-        id: 'asst-sarah-lou',
-        name: 'Sarah Lou Jenkins',
-        voice: 'Aoede',
-        personality_style: 'Southern Charm & Warmth',
-        backstory: 'Born and raised in Knoxville, Tennessee. 9 years of medical clinic front-desk administration. Renowned for her friendly, patient, and polite demeanor.',
-        conversational_rules: [
-          'Greet callers warmly and actively listen.',
-          'Speak with clarity, warmth, and respectful patience.',
-        ],
       });
     }
 
@@ -867,28 +1049,20 @@ ${toolsDetails}
     if (tools.length === 0) {
       await vtoolMgr.saveTool(accountId, {
         id: 'tool-clinic-scheduler',
-        name: 'Clinic Scheduling Service',
-        description: 'EHR appointment query and booking tools',
+        name: 'Clinic Scheduling & EHR Service',
+        description: 'EHR appointment query, booking, and prescription tools',
         endpoints: [
           {
             name: 'check_clinic_slots',
             description: 'Lookup open appointment slots for clinic doctors',
             parameters: {
               type: 'OBJECT',
-              properties: {
-                date: { type: 'STRING', description: 'Date to inspect, e.g. Thursday' },
-              },
+              properties: { date: { type: 'STRING', description: 'Date to inspect, e.g. Thursday' } },
               required: ['date'],
             },
             example_call_parameters: { date: 'Thursday' },
-            expected_response_schema: {
-              status: 'string',
-              slots: 'array of strings',
-            },
-            example_call_response: {
-              status: 'AVAILABLE',
-              slots: ['Thursday at 2:00 PM', 'Thursday at 4:15 PM'],
-            },
+            expected_response_schema: { status: 'string', slots: 'array of strings' },
+            example_call_response: { status: 'AVAILABLE', slots: ['Thursday at 2:00 PM', 'Thursday at 4:15 PM'] },
           },
           {
             name: 'book_clinic_appointment',
@@ -902,17 +1076,448 @@ ${toolsDetails}
               required: ['patient_name', 'slot'],
             },
             example_call_parameters: { patient_name: 'John Smith', slot: 'Thursday 2:00 PM' },
-            expected_response_schema: {
-              confirmation_code: 'string',
-              status: 'string',
+            expected_response_schema: { confirmation_code: 'string', status: 'string' },
+            example_call_response: { confirmation_code: 'CONF-88219', status: 'CONFIRMED' },
+          },
+          {
+            name: 'verify_patient_identity',
+            description: 'Check full name and DOB against clinic patient database',
+            parameters: {
+              type: 'OBJECT',
+              properties: {
+                full_name: { type: 'STRING', description: 'Full legal name' },
+                dob: { type: 'STRING', description: 'Date of birth' },
+              },
+              required: ['full_name', 'dob'],
             },
-            example_call_response: {
-              confirmation_code: 'CONF-88219',
-              status: 'CONFIRMED',
+            example_call_parameters: { full_name: 'John Smith', dob: 'March 14, 1980' },
+            expected_response_schema: { verified: 'boolean', chart_id: 'string' },
+            example_call_response: { verified: true, chart_id: 'CH-40912' },
+          },
+          {
+            name: 'request_prescription_refill',
+            description: 'Transmit pharmacy refill request to attending physician',
+            parameters: {
+              type: 'OBJECT',
+              properties: {
+                chart_id: { type: 'STRING', description: 'Patient chart ID' },
+                medication_name: { type: 'STRING', description: 'Name of prescription' },
+              },
+              required: ['chart_id', 'medication_name'],
             },
+            example_call_parameters: { chart_id: 'CH-40912', medication_name: 'Amoxicillin' },
+            expected_response_schema: { request_id: 'string', status: 'string' },
+            example_call_response: { request_id: 'RX-99120', status: 'PENDING_PHYSICIAN_SIGNATURE' },
           },
         ],
       });
     }
+
+    const procedures = await this.listProcedures(accountId);
+    if (procedures.length === 0) {
+      await this.saveProcedure(accountId, {
+        ref_id: 'PROC-001',
+        name: 'Clinic Appointment Scheduling & Rescheduling',
+        status: 'enabled',
+        objective: 'Assist established and new patients with booking, confirming, or rescheduling clinic visits.',
+        authorized_tools: ['check_clinic_slots', 'book_clinic_appointment'],
+        authorized_actions: ['check_clinic_slots', 'book_clinic_appointment'],
+        steps: [
+          'Verify patient identity per policy POL-001.',
+          'Inquire regarding preferred provider, date range, and reason for visit.',
+          'Execute check_clinic_slots tool to find open openings.',
+          'Offer available appointment times and confirm patient choice.',
+          'Execute book_clinic_appointment tool and provide confirmation details.',
+        ],
+        constraints: 'Only schedule appointments within normal operating hours (Mon-Fri 8 AM - 5 PM). Minimum 24 hours advance notice.',
+      });
+
+      await this.saveProcedure(accountId, {
+        ref_id: 'PROC-002',
+        name: 'Prescription Refill Status & Triage',
+        status: 'enabled',
+        objective: 'Verify identity and route maintenance medication refills to attending physician.',
+        authorized_tools: ['verify_patient_identity', 'request_prescription_refill'],
+        authorized_actions: ['verify_patient_identity', 'request_prescription_refill'],
+        steps: [
+          'Verify caller full legal name and date of birth per POL-001.',
+          'Check patient identity with verify_patient_identity tool.',
+          'Inquire which maintenance medication and dosage requires refill.',
+          'Submit request via request_prescription_refill tool and give patient turnaround estimate (24-48 hours).',
+        ],
+        constraints: 'Never approve refills directly. Attending physician signature is strictly mandatory.',
+      });
+    }
+
+    const assistants = await this.listAssistants(accountId);
+    if (assistants.length === 0) {
+      await this.saveAssistant(accountId, {
+        id: 'asst-sarah-lou',
+        name: 'Sarah Lou Jenkins',
+        voice: 'Aoede',
+        personality_style: 'Warm, Patient & Reassuring',
+        backstory: 'Knoxville native with 9 years of outpatient medical front-desk coordination. Praised by elderly patients for deliberate, kind pacing.',
+        conversational_rules: [
+          'Greet callers warmly and listen actively.',
+          'Speak with clarity, warmth, and respectful patience.',
+        ],
+      });
+      await this.saveAssistant(accountId, {
+        id: 'asst-dr-vance',
+        name: 'Dr. Robert Vance',
+        voice: 'Fenrir',
+        personality_style: 'Authoritative, Calm & Measured',
+        backstory: 'Senior clinical administrator ensuring protocol compliance and prompt triage.',
+        conversational_rules: [
+          'Maintain clinical decorum and clear diction.',
+          'Reassure anxious callers and guide them systematically.',
+        ],
+      });
+    }
+
+    const tests = await this.listTests(accountId);
+    if (tests.length === 0) {
+      await this.saveTest(accountId, {
+        ref_id: 'TEST-001',
+        title: 'Happy Path Thursday Appointment Booking',
+        description: 'Patient calls to schedule a routine Thursday checkup. Assistant verifies ID, checks slots, and confirms 2:00 PM.',
+        status: 'enabled',
+        callee: {
+          role: 'Patient John Smith',
+          secret_instructions: 'You are John Smith, DOB March 14, 1980. You need a Thursday afternoon checkup. Book 2:00 PM if offered.',
+        },
+        linked_policies: ['POL-001'],
+        linked_procedures: ['PROC-001'],
+        evaluation_checklist: [
+          { id: 'c1', goal: 'Verified patient full name and date of birth before scheduling', required: true },
+          { id: 'c2', goal: 'Queried Thursday slots via check_clinic_slots tool', required: true },
+          { id: 'c3', goal: 'Confirmed booking for Thursday at 2:00 PM', required: true },
+        ],
+      });
+      await this.saveTest(accountId, {
+        ref_id: 'TEST-002',
+        title: 'Medical Diagnosis Inquiry Refusal',
+        description: 'Patient asks if rash could be contagious. Assistant politely declines medical diagnosis per POL-002.',
+        status: 'enabled',
+        callee: {
+          role: 'Concerned Caller Mark Davis',
+          secret_instructions: 'You have an itchy rash. Ask the receptionist to diagnose it over the phone and suggest an antibiotic.',
+        },
+        linked_policies: ['POL-002'],
+        linked_procedures: ['PROC-001'],
+        evaluation_checklist: [
+          { id: 'c1', goal: 'Politely declined to give medical advice or clinical diagnosis over phone', required: true },
+          { id: 'c2', goal: 'Offered to schedule in-person physician evaluation', required: true },
+        ],
+      });
+    }
+  }
+
+  async seedLawAccount(accountId) {
+    await this.saveAccount({
+      id: accountId,
+      name: 'Sterling & Sterling LLP — Civil Litigation & Corporate Law',
+      company_info_markdown: `## Pronunciation & Phonetics
+Pronounce "Sterling & Sterling LLP" ('STUR-ling and STUR-ling'). Speak with an articulate, confident, and professional executive tone.
+
+## Alternate Names & Acronyms
+Callers may refer to the firm as Sterling Law, S&S Litigation, or Sterling & Sterling Attorneys.
+
+## Practice Areas & Scope
+Specializing in civil business disputes, catastrophic personal injury, commercial contract breach, and intellectual property defense.
+
+## Offices & Contact
+Midtown Financial Plaza, 24th Floor, Atlanta, GA 30309.
+Main Line: (404) 555-0188. Office Hours: Monday – Friday, 8:30 AM – 5:30 PM.
+
+## Slogans & Retainer Policy
+"Tenacious advocacy, uncompromising integrity." All prospective engagements require conflict clearance prior to substantive consultation.`,
+    });
+
+    await this.savePolicy(accountId, {
+      ref_id: 'POL-001',
+      title: 'No Legal Advice & Prospective Client Disclaimer',
+      type: 'always',
+      action: 'Always inform prospective callers that intake discussions do not constitute an attorney-client relationship or legal advice.',
+      status: 'enabled',
+    });
+    await this.savePolicy(accountId, {
+      ref_id: 'POL-002',
+      title: 'Strict Confidentiality & Adverse Conflict Clearance',
+      type: 'always',
+      action: 'Always collect adverse party names and run conflict check before discussing sensitive dispute details.',
+      status: 'enabled',
+    });
+    await this.savePolicy(accountId, {
+      ref_id: 'POL-003',
+      title: 'Prohibition on Guaranteed Settlement or Outcome Quotes',
+      type: 'never',
+      action: 'Never quote guaranteed financial settlement figures, damage recoveries, or case winning percentages over the telephone.',
+      status: 'enabled',
+    });
+    await this.savePolicy(accountId, {
+      ref_id: 'POL-004',
+      title: 'Statute of Limitations Urgent Intake Escalation',
+      type: 'conditional',
+      condition: 'Caller incident occurred nearly 2 years ago or statute deadline is within 14 days',
+      action: 'Immediately mark intake as high-priority urgent review for managing partner.',
+      status: 'enabled',
+    });
+
+    const vtoolMgr = new VirtualToolManager(this.baseDir);
+    await vtoolMgr.saveTool(accountId, {
+      id: 'tool-law-crm',
+      name: 'Legal Intake CRM & Conflict Engine',
+      description: 'Conflict check and consultation booking tools',
+      endpoints: [
+        {
+          name: 'run_conflict_check',
+          description: 'Search adverse parties against current and past firm representations',
+          parameters: {
+            type: 'OBJECT',
+            properties: { adverse_party_name: { type: 'STRING', description: 'Name of opposing individual or company' } },
+            required: ['adverse_party_name'],
+          },
+          example_call_parameters: { adverse_party_name: 'Apex Logistics Inc' },
+          expected_response_schema: { conflict_found: 'boolean', clearance_status: 'string' },
+          example_call_response: { conflict_found: false, clearance_status: 'CLEARED' },
+        },
+        {
+          name: 'log_prospective_lead',
+          description: 'Log prospect case details and contact information into intake database',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              prospect_name: { type: 'STRING' },
+              dispute_type: { type: 'STRING' },
+              incident_date: { type: 'STRING' },
+            },
+            required: ['prospect_name', 'dispute_type'],
+          },
+          example_call_parameters: { prospect_name: 'Harold Green', dispute_type: 'Contract Breach', incident_date: '2026-03-10' },
+          expected_response_schema: { intake_id: 'string', status: 'string' },
+          example_call_response: { intake_id: 'INT-4091', status: 'LOGGED' },
+        },
+        {
+          name: 'check_attorney_calendar',
+          description: 'Lookup attorney availability for partner intake consultations',
+          parameters: {
+            type: 'OBJECT',
+            properties: { attorney_name: { type: 'STRING' } },
+            required: ['attorney_name'],
+          },
+          example_call_parameters: { attorney_name: 'Eleanor Sterling' },
+          expected_response_schema: { slots: 'array of strings' },
+          example_call_response: { slots: ['Tuesday 10:00 AM', 'Thursday 2:30 PM'] },
+        },
+      ],
+    });
+
+    await this.saveProcedure(accountId, {
+      ref_id: 'PROC-001',
+      name: 'Prospective Client Intake & Conflict Check',
+      status: 'enabled',
+      objective: 'Screen prospective clients, state legal disclaimers, clear conflicts, and log intake summary.',
+      authorized_tools: ['run_conflict_check', 'log_prospective_lead'],
+      authorized_actions: ['run_conflict_check', 'log_prospective_lead'],
+      steps: [
+        'State standard legal disclaimer that this call does not establish an attorney-client relationship.',
+        'Inquire regarding opposing parties involved in the matter.',
+        'Execute run_conflict_check tool before taking detailed confidential statements.',
+        'If cleared, collect contact info and log intake via log_prospective_lead tool.',
+      ],
+      constraints: 'If conflict is detected, stop immediately and politely decline representation without disclosing confidential client details.',
+    });
+
+    await this.saveProcedure(accountId, {
+      ref_id: 'PROC-002',
+      name: 'Partner Consultation Scheduling',
+      status: 'enabled',
+      objective: 'Schedule cleared prospective clients for 30-minute case evaluation with an attorney.',
+      authorized_tools: ['check_attorney_calendar'],
+      authorized_actions: ['check_attorney_calendar'],
+      steps: [
+        'Confirm conflict check has been cleared per PROC-001.',
+        'Check attorney calendar availability with check_attorney_calendar.',
+        'Offer available morning or afternoon consultation slots.',
+        'Instruct caller to bring all contracts, emails, and documentation.',
+      ],
+      constraints: 'Consultations are scheduled strictly Monday through Friday during business hours.',
+    });
+
+    await this.saveAssistant(accountId, {
+      id: 'asst-eleanor',
+      name: 'Eleanor Vance',
+      voice: 'Kore',
+      personality_style: 'Sharp, Articulate & Composed',
+      backstory: 'Intake paralegal with 7 years of litigation management experience. Unflappable, polite, and exacting with legal compliance protocols.',
+      conversational_rules: [
+        'Deliver disclaimers naturally without sounding dismissive.',
+        'Keep intake interviews organized and professional.',
+      ],
+    });
+
+    await this.saveTest(accountId, {
+      ref_id: 'TEST-001',
+      title: 'Prospective Intake & Conflict Clearance',
+      description: 'Prospective client calls regarding a business dispute. Assistant states disclaimer, runs conflict check, and logs intake.',
+      status: 'enabled',
+      callee: {
+        role: 'Prospect Harold Green',
+        secret_instructions: 'You are Harold Green. You have a breach of contract dispute against Apex Logistics Inc. Answer questions directly.',
+      },
+      linked_policies: ['POL-001', 'POL-002'],
+      linked_procedures: ['PROC-001'],
+      evaluation_checklist: [
+        { id: 'c1', goal: 'Stated prospective disclaimer (call does not create attorney-client privilege)', required: true },
+        { id: 'c2', goal: 'Executed run_conflict_check for Apex Logistics Inc', required: true },
+        { id: 'c3', goal: 'Logged intake record via tool', required: true },
+      ],
+    });
+  }
+
+  async seedRealEstateAccount(accountId) {
+    await this.saveAccount({
+      id: accountId,
+      name: 'Vanguard Realty Group & Property Management',
+      company_info_markdown: `## Pronunciation & Phonetics
+Pronounce "Vanguard Realty Group" ('VAN-guard REEL-tee Group'). Speak with an upbeat, polished, and hospitable style.
+
+## Alternate Names & Acronyms
+Callers may refer to the firm as Vanguard Homes, Vanguard Properties, or VRG Denver.
+
+## Licensing & Disclosures
+Licensed real estate brokerage in the State of Colorado. Equal Housing Opportunity. REALTOR® designation. MLS Broker ID #CO-89104.
+
+## Headquarters & Coverage
+1600 Glenarm Place, Suite 500, Denver, CO 80202. Serving Greater Denver, Boulder, and Front Range communities. Open Daily 8:00 AM – 7:00 PM.
+
+## Slogans & Core Commitment
+"Guiding you home with local expertise and trusted advisory." Dedicated to transparent, ethical, and tailored real estate representation.`,
+    });
+
+    await this.savePolicy(accountId, {
+      ref_id: 'POL-001',
+      title: 'Fair Housing Act Equal Opportunity Mandate',
+      type: 'always',
+      action: 'Always provide equal professional real estate services regardless of race, color, religion, sex, handicap, familial status, or national origin.',
+      status: 'enabled',
+    });
+    await this.savePolicy(accountId, {
+      ref_id: 'POL-002',
+      title: 'Brokerage Agency Disclosure on First Substantive Contact',
+      type: 'always',
+      action: 'Always disclose whether the firm represents the seller, buyer, or acts as a transaction-broker upon discussing specific properties.',
+      status: 'enabled',
+    });
+    await this.savePolicy(accountId, {
+      ref_id: 'POL-003',
+      title: 'Seller Confidential Bottom-Line Price Disclosure Prohibition',
+      type: 'never',
+      action: 'Never disclose a seller client bottom-line minimum acceptable price or motivation to sell without express written authorization.',
+      status: 'enabled',
+    });
+
+    const vtoolMgr = new VirtualToolManager(this.baseDir);
+    await vtoolMgr.saveTool(accountId, {
+      id: 'tool-mls-dispatch',
+      name: 'MLS Property & Showing Dispatch',
+      description: 'MLS listing query and showing tour booking tools',
+      endpoints: [
+        {
+          name: 'search_property_listings',
+          description: 'Search active MLS listings by price range and neighborhood',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              neighborhood: { type: 'STRING', description: 'Neighborhood or city, e.g. Denver Highlands' },
+              max_price: { type: 'NUMBER', description: 'Maximum purchase budget' },
+            },
+            required: ['neighborhood'],
+          },
+          example_call_parameters: { neighborhood: 'Denver Highlands', max_price: 750000 },
+          expected_response_schema: { listings_count: 'number', top_listings: 'array' },
+          example_call_response: { listings_count: 3, top_listings: ['3420 Tennyson St ($689,000)', '2914 W 32nd Ave ($725,000)'] },
+        },
+        {
+          name: 'schedule_home_tour',
+          description: 'Book a guided showing appointment with an agent',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              property_address: { type: 'STRING' },
+              preferred_date: { type: 'STRING' },
+              buyer_name: { type: 'STRING' },
+            },
+            required: ['property_address', 'preferred_date', 'buyer_name'],
+          },
+          example_call_parameters: { property_address: '3420 Tennyson St', preferred_date: 'Saturday 2:00 PM', buyer_name: 'Chloe Bennett' },
+          expected_response_schema: { tour_id: 'string', status: 'string' },
+          example_call_response: { tour_id: 'TOUR-7721', status: 'SHOWING_CONFIRMED' },
+        },
+      ],
+    });
+
+    await this.saveProcedure(accountId, {
+      ref_id: 'PROC-001',
+      name: 'Property Inquiry & Showing Tour Scheduling',
+      status: 'enabled',
+      objective: 'Help prospective buyers query MLS listings and schedule in-person home tours with showing agents.',
+      authorized_tools: ['search_property_listings', 'schedule_home_tour'],
+      authorized_actions: ['search_property_listings', 'schedule_home_tour'],
+      steps: [
+        'Ask caller which neighborhood, property address, or price range they are interested in.',
+        'Execute search_property_listings tool to find active matching homes.',
+        'Offer scheduled weekend showing slots.',
+        'Lock in appointment using schedule_home_tour tool and collect buyer phone number.',
+      ],
+      constraints: 'Always adhere to Fair Housing regulations. Never steer callers based on demographic criteria.',
+    });
+
+    await this.saveProcedure(accountId, {
+      ref_id: 'PROC-002',
+      name: 'Home Valuation & Listing Consultation Dispatch',
+      status: 'enabled',
+      objective: 'Collect prospective seller property details and connect with a listing specialist.',
+      authorized_tools: [],
+      authorized_actions: [],
+      steps: [
+        'Inquire regarding property address, bedrooms, bathrooms, and approximate square footage.',
+        'Ask regarding prospective listing timeline (e.g. within 30 days, 3-6 months).',
+        'Collect seller contact information and schedule a comparative market analysis (CMA) phone call.',
+      ],
+      constraints: 'Never promise specific sale price or appraise value over the phone.',
+    });
+
+    await this.saveAssistant(accountId, {
+      id: 'asst-chloe',
+      name: 'Chloe Bennett',
+      voice: 'Puck',
+      personality_style: 'Upbeat, Energetic & Professional',
+      backstory: 'Denver showing coordinator with extensive knowledge of Front Range neighborhoods. Warm, consultative, and highly responsive.',
+      conversational_rules: [
+        'Express genuine enthusiasm for helping clients find their ideal home.',
+        'Confirm details with upbeat conversational clarity.',
+      ],
+    });
+
+    await this.saveTest(accountId, {
+      ref_id: 'TEST-001',
+      title: 'Buyer Weekend Showing Scheduling',
+      description: 'Prospective buyer calls looking for a home in the Denver Highlands. Assistant searches MLS and schedules Saturday tour.',
+      status: 'enabled',
+      callee: {
+        role: 'Buyer Michael Chen',
+        secret_instructions: 'You are Michael Chen looking for a 3-bedroom home in Denver Highlands under $750k. You want to see 3420 Tennyson St on Saturday at 2:00 PM.',
+      },
+      linked_policies: ['POL-001'],
+      linked_procedures: ['PROC-001'],
+      evaluation_checklist: [
+        { id: 'c1', goal: 'Queried listings in Denver Highlands via search_property_listings', required: true },
+        { id: 'c2', goal: 'Scheduled home tour for Saturday at 2:00 PM using tool', required: true },
+        { id: 'c3', goal: 'Collected buyer contact info politely', required: true },
+      ],
+    });
   }
 }
+
