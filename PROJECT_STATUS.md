@@ -107,8 +107,13 @@ When compiling the system prompt for an assistant (`compileAssistantPrompt`), it
 
 ### I. Recycle Bin & Soft-Delete Archive
 - Path: `data/accounts/<account-id>/recycle-bin/`
-- All assistant, tool, policy, and scenario deletions are soft-deleted into the recycle bin.
+- Tool, policy, procedure, and scenario deletions are soft-deleted into the recycle bin. The singleton assistant cannot be deleted.
 - Accessible via the bottom sidebar drawer to restore items or permanently clear them to the audit archive.
+
+### J. Rich Demo Account Data
+- Startup enrichment is idempotent and adds only missing named records.
+- Each visible demo account has nine company-profile sections, at least seven policies, at least three multi-endpoint tool services, and four or more enabled test scenarios.
+- Domain coverage includes patient billing and advocacy, civil-litigation intake, real-estate transactions, property management, privacy, emergency escalation, and adversarial guardrail tests.
 
 ---
 

@@ -162,6 +162,7 @@ Testing Standalone Test Scenarios & Certification Runtime Mapping...
 - **Singleton Assistant Schema**: Every account has one `assistant.yaml`; legacy plural assistant files are collapsed destructively to one retained assistant.
 - **Soft-Delete Recycle Bin**: Deletions are safely staged in `recycle-bin/` where they can be restored or cleared to an immutable audit archive.
 - **Isolated Sandboxes**: Tool execution data is strictly isolated per agent toolbelt.
+- **Rich Demo Workspaces**: Seeded accounts are idempotently expanded with nine profile sections, domain-specific policy libraries, multi-endpoint tool services, and adversarial certification scenarios.
 
 ---
 

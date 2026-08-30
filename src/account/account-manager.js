@@ -9,6 +9,7 @@ import path from 'path';
 import yaml from 'yaml';
 import { VirtualToolManager } from '../tools/virtual-tool-manager.js';
 import { config } from '../config.js';
+import { DEMO_DATA_ENHANCEMENTS } from './demo-data-enhancements.js';
 
 export class AccountManager {
   constructor(baseDir = 'data/accounts') {
@@ -1083,6 +1084,51 @@ ${toolsDetails}
     const realId = 'acct-real-vanguard';
     if (!existingIds.has(realId)) {
       await this.seedRealEstateAccount(realId);
+    }
+
+    await this.ensureRichDemoAccountData();
+  }
+
+  async ensureRichDemoAccountData() {
+    const accounts = await this.listAccounts();
+    const virtualToolManager = new VirtualToolManager(this.baseDir);
+
+    for (const account of accounts) {
+      const enhancement = Object.values(DEMO_DATA_ENHANCEMENTS).find(candidate => candidate.match(account));
+      if (!enhancement) continue;
+
+      const companyInfo = await this.getCompanyInfo(account.id);
+      let markdown = companyInfo.markdown || '';
+      let companyInfoChanged = false;
+      if (markdown.includes('Our Organization')) {
+        markdown = markdown.replaceAll('Our Organization', account.name);
+        companyInfoChanged = true;
+      }
+      for (const [title, body] of enhancement.companySections) {
+        if (!markdown.includes(`## ${title}`)) {
+          markdown = `${markdown.trim()}\n\n## ${title}\n${body}\n`;
+          companyInfoChanged = true;
+        }
+      }
+      if (companyInfoChanged) await this.saveCompanyInfo(account.id, markdown);
+
+      const policies = await this.listPolicies(account.id);
+      const policyKeys = new Set(policies.flatMap(policy => [policy.id, policy.ref_id]).filter(Boolean));
+      for (const policy of enhancement.policies) {
+        if (!policyKeys.has(policy.id)) await this.savePolicy(account.id, policy);
+      }
+
+      const tools = await virtualToolManager.listTools(account.id);
+      const toolIds = new Set(tools.map(tool => tool.id));
+      for (const tool of enhancement.tools) {
+        if (!toolIds.has(tool.id)) await virtualToolManager.saveTool(account.id, tool);
+      }
+
+      const tests = await this.listTests(account.id);
+      const testKeys = new Set(tests.flatMap(test => [test.id, test.ref_id]).filter(Boolean));
+      for (const test of enhancement.tests) {
+        if (!testKeys.has(test.id)) await this.saveTest(account.id, test);
+      }
     }
   }
 

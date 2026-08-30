@@ -77,18 +77,12 @@ class TalkDojoEnterpriseApp {
       navBadgeGapsCount: document.getElementById('nav-badge-gaps-count'),
       navBadgeCert: document.getElementById('nav-badge-cert'),
 
-      // Top Header
-      headerAccountName: document.getElementById('header-account-name'),
-      btnHeaderAccountSwitcher: document.getElementById('btn-header-account-switcher'),
+      // Account Settings
       btnAccountSettings: document.getElementById('btn-account-settings'),
       btnNewAccount: document.getElementById('btn-new-account'),
-      activeDeploymentBadge: document.getElementById('active-deployment-badge'),
-      activeDeployText: document.getElementById('active-deploy-text'),
       apiKeyInput: document.getElementById('api-key-input'),
       saveKeyBtn: document.getElementById('save-key-btn'),
-      keyStatusIndicator: document.getElementById('key-status-indicator'),
       btnOpenRecycleBin: document.getElementById('btn-open-recycle-bin'),
-      recycleBinCount: document.getElementById('recycle-bin-count'),
 
       // Tab 1: Account (Company Info Dynamic Markdown)
       accName: document.getElementById('acc-name'),
@@ -433,8 +427,7 @@ class TalkDojoEnterpriseApp {
       });
     });
 
-    // Account Settings & Header
-    this.el.btnHeaderAccountSwitcher.addEventListener('click', () => this.openAccountSwitcher());
+    // Account Settings
     this.el.btnAccountSettings.addEventListener('click', () => this.navigate('accountsettings', 'overview'));
     this.el.btnOpenAccountSwitcher.addEventListener('click', () => this.openAccountSwitcher());
     this.el.btnCloseAccountSwitcher.addEventListener('click', () => this.closeAccountSwitcher());
@@ -689,7 +682,6 @@ class TalkDojoEnterpriseApp {
       const acc = await res.json();
       if (!acc) return;
 
-      this.el.headerAccountName.textContent = acc.name || 'Account';
       this.el.settingsCurrentAccountName.textContent = `${acc.name || 'Account'} · ${acc.id}`;
       this.el.accName.value = acc.name || '';
       await this.loadCompanyInfo(accountId);
@@ -699,8 +691,6 @@ class TalkDojoEnterpriseApp {
       await this.loadTestScenarios(accountId, this.testFilter);
       await this.loadCoverageGaps(accountId);
       await this.loadAssistant(accountId);
-      await this.refreshRecycleBinCount();
-      await this.loadActiveDeploymentBadge();
       this.renderAccountSwitcher();
       this.adjustAllAutoGrow();
     } catch (e) {
@@ -1206,7 +1196,7 @@ class TalkDojoEnterpriseApp {
       return `
         <div class="asst-master-item ${p.id === this.activePolicyId ? 'active' : ''}" data-id="${p.id}">
           <div class="flex-between">
-            <span class="ref-badge ref-badge-pol">${p.id}</span>
+            <span class="ref-badge ref-badge-pol">${p.ref_id || p.id}</span>
             <span class="type-pill ${typeClass}">${p.type}</span>
           </div>
           <div class="asst-master-title mt-1">${p.title}</div>
@@ -1229,7 +1219,7 @@ class TalkDojoEnterpriseApp {
 
   populatePolicyForm(policy) {
     if (!policy) return;
-    this.el.policyRefIdBadge.textContent = policy.id;
+    this.el.policyRefIdBadge.textContent = policy.ref_id || policy.id;
     this.el.policyEditorTitle.textContent = policy.title || 'Edit Policy';
     this.el.policyTitleInput.value = policy.title || '';
     this.el.policyTypeSelect.value = policy.type || 'always';
@@ -1242,7 +1232,9 @@ class TalkDojoEnterpriseApp {
 
     // Coverage Gap Warning check
     if (this.el.policyUncoveredWarning) {
-      const isUncovered = (this.coverageGaps.uncovered_policies || []).some(p => p.id === policy.id || p.ref_id === policy.id);
+      const isUncovered = (this.coverageGaps.uncovered_policies || []).some(p =>
+        p.id === policy.id || p.ref_id === policy.id || p.ref_id === policy.ref_id
+      );
       this.el.policyUncoveredWarning.classList.toggle('hidden', !isUncovered);
     }
 
@@ -2591,35 +2583,12 @@ class TalkDojoEnterpriseApp {
       b.addEventListener('click', async () => {
         await fetch(`/api/accounts/${this.activeAccountId}/certification/snapshots/${b.dataset.id}/deploy`, { method: 'POST' });
         await this.loadCertificationHistory();
-        await this.loadActiveDeploymentBadge();
         this.showToast('Snapshot configuration deployed as active production!');
       });
     });
   }
 
-  async loadActiveDeploymentBadge() {
-    try {
-      const res = await fetch(`/api/accounts/${this.activeAccountId}/certification/active`);
-      const data = await res.json();
-      if (data && data.activeSnapshot) {
-        this.el.activeDeploymentBadge.classList.remove('hidden');
-        this.el.activeDeployText.textContent = `Active: ${data.activeSnapshot.assistantName || 'Assistant'} (${data.activeSnapshot.snapshotId || data.activeSnapshot.id})`;
-      } else {
-        this.el.activeDeployText.textContent = 'Active: None';
-      }
-    } catch (e) {}
-  }
-
   // --- RECYCLE BIN & API KEY ---
-
-  async refreshRecycleBinCount() {
-    try {
-      const res = await fetch(`/api/accounts/${this.activeAccountId}/recycle-bin`);
-      const data = await res.json();
-      const count = Array.isArray(data) ? data.length : (data.items?.length || 0);
-      this.el.recycleBinCount.textContent = count;
-    } catch (e) {}
-  }
 
   async openRecycleBin() {
     this.el.recycleBinDrawer.classList.remove('hidden');
@@ -2645,7 +2614,6 @@ class TalkDojoEnterpriseApp {
         b.addEventListener('click', async () => {
           await fetch(`/api/accounts/${this.activeAccountId}/recycle-bin/${b.dataset.id}/restore`, { method: 'POST' });
           await this.openRecycleBin();
-          await this.refreshRecycleBinCount();
           this.showToast('Item restored!');
         });
       });
@@ -2660,7 +2628,6 @@ class TalkDojoEnterpriseApp {
     if (!confirm('Permanently clear all items to audit archive?')) return;
     await fetch(`/api/accounts/${this.activeAccountId}/recycle-bin`, { method: 'DELETE' });
     this.closeRecycleBin();
-    await this.refreshRecycleBinCount();
     this.showToast('Recycle bin cleared to archive');
   }
 
@@ -2683,13 +2650,7 @@ class TalkDojoEnterpriseApp {
   }
 
   updateKeyStatus(hasKey) {
-    if (hasKey) {
-      this.el.keyStatusIndicator.className = 'key-dot status-active';
-      this.el.keyStatusIndicator.title = 'API Key Valid & Active';
-    } else {
-      this.el.keyStatusIndicator.className = 'key-dot status-missing';
-      this.el.keyStatusIndicator.title = 'API Key Required';
-    }
+    this.el.saveKeyBtn.title = hasKey ? 'API key is configured' : 'API key is required';
   }
 
   // --- WEBSOCKET LIVE STREAMING ---

@@ -330,6 +330,27 @@ async function runTests() {
   assert(runtimeTest.caller.tools.every(tool => authorizedNames.includes(tool.name)), 'Runtime toolbelt must be limited to linked procedure actions');
   console.log(`   Standalone Scenarios Confirmed (${runtimeTest.caller.tools.length} authorized runtime actions)`);
 
+  console.log('Testing Idempotent Demo Account Enrichment...');
+  const demoAccount = (await testAccountManager.listAccounts()).find(account =>
+    account.id.startsWith('acct-smk') || account.id.startsWith('acct-med')
+  );
+  const demoBefore = {
+    sections: (await testAccountManager.getCompanyInfo(demoAccount.id)).sections.length,
+    policies: (await testAccountManager.listPolicies(demoAccount.id)).length,
+    tools: (await new VirtualToolManager('data/test-accounts').listTools(demoAccount.id)).length,
+    tests: (await testAccountManager.listTests(demoAccount.id)).length,
+  };
+  await testAccountManager.ensureRichDemoAccountData();
+  const demoAfter = {
+    sections: (await testAccountManager.getCompanyInfo(demoAccount.id)).sections.length,
+    policies: (await testAccountManager.listPolicies(demoAccount.id)).length,
+    tools: (await new VirtualToolManager('data/test-accounts').listTools(demoAccount.id)).length,
+    tests: (await testAccountManager.listTests(demoAccount.id)).length,
+  };
+  assert.deepStrictEqual(demoAfter, demoBefore, 'Demo enrichment must not duplicate records on repeat startup');
+  assert(demoAfter.sections >= 9 && demoAfter.policies >= 8 && demoAfter.tools >= 3 && demoAfter.tests >= 4, 'Medical demo must contain rich representative data');
+  console.log(`   Demo Richness Confirmed (${demoAfter.sections} sections, ${demoAfter.policies} policies, ${demoAfter.tools} tools, ${demoAfter.tests} tests)`);
+
   // Test destructive migration from plural assistant files to the singleton schema
   console.log('Testing One-Assistant-Per-Account Schema Migration...');
   const singletonRoot = path.resolve(process.cwd(), 'data/test-single-assistant');

@@ -122,3 +122,14 @@ Completed on 2026-08-30:
 7. Simplified certification so it automatically uses the account assistant and only asks for execution mode.
 
 Automated and browser verification results should be recorded with the completing commit.
+
+## 6. Header Cleanup & Demo Data Enrichment
+
+Completed on 2026-08-30:
+
+1. Removed the remaining top account switcher, active-deployment pill, and API-key status dot; account switching remains exclusively in Account Settings.
+2. Removed the recycle-bin count from the bottom Account Settings button and replaced its red recycle styling with a neutral/cyan navigation state.
+3. Added idempotent domain enrichment in `src/account/demo-data-enhancements.js` for all four visible demo accounts.
+4. Expanded demo company profiles to nine sections each and raised every demo to at least seven policies, three tool services, and four enabled scenarios.
+5. Added detailed billing, healthcare advocacy, legal intake, secure document, court docket, property-management, and transaction-coordination tool schemas with realistic examples.
+6. Added adversarial scenarios covering privacy, outcome guarantees, emergency escalation, secure records, Fair Housing, contract interpretation, conflicts, deadlines, and payment-card handling.
