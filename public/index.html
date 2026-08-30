@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Talk Dojo 🥋 — Enterprise Voice AI Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="app-layout">
+    <!-- Left Vertical Action Bar with Collapsible Sub-Navigation -->
+    <aside class="sidebar-nav">
+      <div class="sidebar-brand">
+        <span class="brand-icon">🥋</span>
+        <div class="brand-text">
+          <div class="brand-name">TALK DOJO</div>
+          <div class="brand-sub">Enterprise Studio</div>
+        </div>
+      </div>
+
+      <nav class="nav-links">
+        <!-- 1. 🏢 Account (Company Info) -->
+        <button class="nav-item active" data-tab="account" data-sub="info" title="Company Info & Organization Profile">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Account</span>
+        </button>
+
+        <!-- 2. 🛠️ Tools (Immediately under Account and above Policies) -->
+        <div class="nav-tree-group" id="nav-group-tools">
+          <button class="nav-item nav-tree-header" data-tab="tools" data-sub="all" title="Tools & Integrations">
+            <span class="nav-icon">🛠️</span>
+            <span class="nav-label">Tools</span>
+            <span id="nav-badge-tools" class="nav-count">0</span>
+            <span class="tree-arrow">▾</span>
+          </button>
+          <div class="nav-sub-tree">
+            <button class="nav-sub-item active" data-tab="tools" data-sub="all">All Tools</button>
+            <button class="nav-sub-item" data-tab="tools" data-sub="new">+ New Tool</button>
+          </div>
+        </div>
+
+        <!-- 3. 📜 Policies (Always, Never, Conditional) -->
+        <div class="nav-tree-group" id="nav-group-policies">
+          <button class="nav-item nav-tree-header" data-tab="policies" data-sub="all_enabled" title="Immutable Compliance Policies">
+            <span class="nav-icon">📜</span>
+            <span class="nav-label">Policies</span>
+            <span id="nav-badge-policies" class="nav-count">0</span>
+            <span class="tree-arrow">▾</span>
+          </button>
+          <div class="nav-sub-tree">
+            <button class="nav-sub-item active" data-tab="policies" data-sub="all_enabled">All Enabled</button>
+            <button class="nav-sub-item" data-tab="policies" data-sub="always">Always</button>
+            <button class="nav-sub-item" data-tab="policies" data-sub="never">Never</button>
+            <button class="nav-sub-item" data-tab="policies" data-sub="conditional">Conditional</button>
+            <button class="nav-sub-item" data-tab="policies" data-sub="draft">Draft</button>
+            <button class="nav-sub-item" data-tab="policies" data-sub="disabled">Disabled</button>
+            <button class="nav-sub-item" data-tab="policies" data-sub="new">+ New Policy</button>
+          </div>
+        </div>
+
+        <!-- 4. 📋 Procedures (Workflows & Integrated Test Scenarios) -->
+        <div class="nav-tree-group" id="nav-group-procedures">
+          <button class="nav-item nav-tree-header" data-tab="procedures" data-sub="all_enabled" title="Procedures & Authorized Workflows">
+            <span class="nav-icon">📋</span>
+            <span class="nav-label">Procedures</span>
+            <span id="nav-badge-procedures" class="nav-count">0</span>
+            <span class="tree-arrow">▾</span>
+          </button>
+          <div class="nav-sub-tree">
+            <button class="nav-sub-item active" data-tab="procedures" data-sub="all_enabled">All Enabled</button>
+            <button class="nav-sub-item" data-tab="procedures" data-sub="drafts">Drafts <span id="nav-badge-proc-drafts" class="badge-mini">0</span></button>
+            <button class="nav-sub-item" data-tab="procedures" data-sub="new">+ New Procedure</button>
+          </div>
+        </div>
+
+        <!-- 5. 🤖 Assistants -->
+        <div class="nav-tree-group" id="nav-group-assistants">
+          <button class="nav-item nav-tree-header" data-tab="assistants" data-sub="all" title="Virtual Assistants">
+            <span class="nav-icon">🤖</span>
+            <span class="nav-label">Assistants</span>
+            <span id="nav-badge-assistants" class="nav-count">0</span>
+            <span class="tree-arrow">▾</span>
+          </button>
+          <div class="nav-sub-tree">
+            <button class="nav-sub-item active" data-tab="assistants" data-sub="all">All Assistants</button>
+            <button class="nav-sub-item" data-tab="assistants" data-sub="new">+ New Assistant</button>
+          </div>
+        </div>
+
+        <!-- 6. 🏆 Certification -->
+        <div class="nav-tree-group" id="nav-group-certification">
+          <button class="nav-item nav-tree-header" data-tab="certification" data-sub="history" title="Test Certification & Deployments">
+            <span class="nav-icon">🏆</span>
+            <span class="nav-label">Certification</span>
+            <span id="nav-badge-cert" class="nav-status-dot"></span>
+            <span class="tree-arrow">▾</span>
+          </button>
+          <div class="nav-sub-tree">
+            <button class="nav-sub-item active" data-tab="certification" data-sub="history">History & Deployments</button>
+            <button class="nav-sub-item" data-tab="certification" data-sub="new">+ New Certification</button>
+          </div>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="btn-open-recycle-bin" class="btn-recycle-bin" title="Open Recycle Bin">
+          <span>🗑️</span> Recycle Bin <span id="recycle-bin-count" class="badge-mini">0</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="content-area">
+      <!-- Top Global Header -->
+      <header class="dojo-top-header">
+        <div class="header-left">
+          <div class="selector-capsule">
+            <span class="capsule-label">Account:</span>
+            <select id="account-select" class="select-soft"></select>
+            <button id="btn-new-account" class="btn-icon-soft" title="Create New Account">+</button>
+          </div>
+
+          <div class="selector-capsule">
+            <span class="capsule-label">Assistant:</span>
+            <select id="assistant-select" class="select-soft"></select>
+            <button id="btn-new-assistant-top" class="btn-icon-soft" title="Create Assistant">+</button>
+          </div>
+
+          <div id="active-deployment-badge" class="deployment-chip" title="Active Deployed Configuration">
+            <span class="chip-dot"></span>
+            <span id="active-deploy-text">Active: Sarah Lou (Cert v1)</span>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <div class="api-key-soft">
+            <input type="password" id="api-key-input" placeholder="Gemini API Key..." spellcheck="false">
+            <button id="save-key-btn" class="btn-soft-xs">Save</button>
+            <span id="key-status-indicator" class="key-dot status-missing" title="API Key Required">●</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Panes Container -->
+      <main class="panes-container">
+
+        <!-- ============================================================ -->
+        <!-- TAB 1: 🏢 ACCOUNT                                            -->
+        <!-- ============================================================ -->
+        <section id="pane-account" class="tab-pane active">
+          <div class="pane-header">
+            <div>
+              <h2>🏢 Company Information & Organization Profile</h2>
+              <p class="text-muted text-xs">Manage your organization name and customizable Markdown sections providing essential company context for your assistants.</p>
+            </div>
+            <div class="flex-center gap-2">
+              <button id="btn-toggle-raw-markdown" class="btn-soft-xs">📝 Raw Markdown</button>
+              <button id="btn-add-section-card" class="btn-soft-xs">+ Add Section Card</button>
+              <button id="btn-save-company-info" class="btn-primary-cyan">Save Company Info</button>
+            </div>
+          </div>
+
+          <!-- Guidance Callout Banner -->
+          <div class="guidance-banner">
+            <span class="guidance-icon">💡</span>
+            <div class="guidance-content">
+              <h4>How This Information Is Used By Assistants</h4>
+              <p>This information is compiled directly into <strong>Block 1</strong> of every assistant's system prompt. Assistants consult these dynamic sections to correctly pronounce your organization's name, recognize alternate acronyms used by callers, quote official contact details and business hours, and embody your company slogans.</p>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="form-group">
+              <label for="acc-name"><strong>Organization / Account Name</strong> (Required & Referential)</label>
+              <input type="text" id="acc-name" class="input-soft" placeholder="e.g. Smoky Mountain Family Medicine" style="font-size: 1rem; font-weight: 600;">
+            </div>
+          </div>
+
+          <!-- Section Cards Container (Parsed from Markdown Headers) -->
+          <div id="company-sections-container"></div>
+
+          <!-- Optional Raw Markdown Fallback Editor (Hidden by default) -->
+          <div id="company-raw-markdown-box" class="card hidden mt-3">
+            <div class="flex-between mb-2">
+              <label for="company-raw-markdown"><strong>Unified Company Info Markdown</strong></label>
+              <span class="text-xs text-dim">Headers (# or ##) become section cards</span>
+            </div>
+            <textarea id="company-raw-markdown" class="textarea-soft auto-grow" rows="12" placeholder="Write markdown here..."></textarea>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- TAB 2: 🛠️ TOOLS (MASTER-DETAIL FOR ALL, FOCUSED FOR NEW)     -->
+        <!-- ============================================================ -->
+        <section id="pane-tools" class="tab-pane">
+          <!-- Sub-View 1: All Tools (Master-Detail) -->
+          <div id="tools-subview-all">
+            <div class="pane-header">
+              <div>
+                <h2>🛠️ Tools & Endpoint Integrations</h2>
+                <p class="text-muted text-xs">Manage MCP-compatible tool definitions, parameters, and example calls for your assistants.</p>
+              </div>
+              <button id="btn-tools-nav-new" class="btn-primary-cyan">+ New Tool</button>
+            </div>
+
+            <!-- Guidance Callout Banner -->
+            <div class="guidance-banner">
+              <span class="guidance-icon">💡</span>
+              <div class="guidance-content">
+                <h4>How Tools Are Governed & Executed</h4>
+                <p>Tools provide external capabilities such as checking doctor calendars, querying EHR balances, or reserving slots. <strong>Procedures</strong> authorize and constrain which tools assistants are permitted to use. Assistants strictly decline caller requests that are not covered by an enabled procedure authorizing the necessary tools.</p>
+              </div>
+            </div>
+
+            <div class="master-detail-grid">
+              <!-- Left Master: Tools List -->
+              <div class="master-col">
+                <div class="card p-3">
+                  <div class="flex-between mb-3">
+                    <span class="text-xs font-bold text-dim">AVAILABLE TOOLS (<span id="tools-master-count">0</span>)</span>
+                    <button id="btn-master-add-tool" class="btn-soft-xs">+ Add</button>
+                  </div>
+                  <div id="tools-master-list" class="assistants-master-list"></div>
+                </div>
+              </div>
+
+              <!-- Right Detail: Tool Details & Endpoints Editor -->
+              <div class="detail-col">
+                <div id="tools-zero-state" class="empty-card hidden">
+                  <div class="empty-icon">🛠️</div>
+                  <h3>No tools created, yet.</h3>
+                  <p class="text-muted text-xs">Define tools so your assistants can check schedules, verify records, or update calendars.</p>
+                  <button id="btn-empty-start-tool" class="btn-primary-cyan mt-3">+ Create First Tool</button>
+                </div>
+
+                <div id="tool-editor-card" class="card">
+                  <div class="flex-between mb-3 border-b pb-2">
+                    <div>
+                      <h3 id="tool-editor-title">Edit Tool</h3>
+                      <span id="tool-editor-sub" class="text-xs text-muted">Configure endpoints and schemas</span>
+                    </div>
+                    <div class="flex-center gap-2">
+                      <button id="btn-tool-delete" class="btn-danger-soft">🗑️ Delete</button>
+                      <button id="btn-tool-save" class="btn-primary-cyan">Save Tool</button>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="tool-name-input">Tool Service Name</label>
+                    <input type="text" id="tool-name-input" class="input-soft" placeholder="e.g. Clinic EHR & Scheduling">
+                  </div>
+
+                  <div class="form-group">
+                    <label for="tool-desc-input">Description</label>
+                    <textarea id="tool-desc-input" class="textarea-soft auto-grow" rows="2" placeholder="Describe purpose of tool..."></textarea>
+                  </div>
+
+                  <!-- Endpoints List -->
+                  <div class="form-group">
+                    <div class="flex-between mb-2">
+                      <label><strong>Endpoints & Callables</strong></label>
+                      <button id="btn-add-tool-endpoint" class="btn-soft-xs">+ Add Endpoint</button>
+                    </div>
+                    <div id="tool-endpoints-list" class="endpoints-container"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-View 2: + New Tool (Focused Page Only) -->
+          <div id="tools-subview-new" class="hidden">
+            <div class="pane-header">
+              <div>
+                <h2>✨ Create New Tool</h2>
+                <p class="text-muted text-xs">Author a new tool integration using AI natural language description or create a blank template.</p>
+              </div>
+              <button id="btn-tools-cancel-new" class="btn-soft-xs">← Back to All Tools</button>
+            </div>
+
+            <div class="card card-ai-prompt mb-3">
+              <span class="text-xs text-cyan font-bold block mb-2">Option A: Describe What Your Assistant Needs</span>
+              <div class="flex-gap-2 mb-2">
+                <input type="text" id="new-tool-prompt-input" class="input-soft flex-1" placeholder="e.g. Calendar tools to check doctor availability with relative dates and book clinic appointments...">
+                <button id="btn-ai-create-tool" class="btn-primary-cyan">✨ Generate Tool Endpoints</button>
+              </div>
+
+              <!-- Animated Waiting State with Elapsed Timer -->
+              <div id="tool-gen-loading-state" class="loading-box hidden">
+                <div class="loading-spinner"></div>
+                <div class="loading-timer">
+                  <span class="pulse-dot"></span>
+                  <span id="tool-gen-timer">Waiting: 0s</span>
+                </div>
+                <span id="tool-gen-status-text" class="text-xs text-muted">Synthesizing MCP schemas and endpoint definitions...</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <span class="text-xs font-bold text-muted block mb-2">Option B: Start from Blank Template</span>
+              <div class="form-group">
+                <label for="blank-tool-name">Tool Name</label>
+                <input type="text" id="blank-tool-name" class="input-soft" placeholder="e.g. Patient CRM Lookup">
+              </div>
+              <button id="btn-create-blank-tool" class="btn-soft-xs">+ Create Empty Tool</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- TAB 3: 📜 POLICIES (ALWAYS, NEVER, CONDITIONAL)              -->
+        <!-- ============================================================ -->
+        <section id="pane-policies" class="tab-pane">
+          <div class="pane-header">
+            <div>
+              <h2>📜 Immutable Compliance Policies</h2>
+              <p class="text-muted text-xs">Define mandatory behavioral rules, strict prohibitions, and conditional directives with clean reference IDs (POL-xxx).</p>
+            </div>
+            <div class="flex-center gap-2">
+              <button id="btn-policies-nav-new" class="btn-primary-cyan">+ New Policy</button>
+            </div>
+          </div>
+
+          <!-- Guidance Callout Banner -->
+          <div class="guidance-banner">
+            <span class="guidance-icon">💡</span>
+            <div class="guidance-content">
+              <h4>How Policies Are Enforced on Calls</h4>
+              <p>Policies are compiled into <strong>Block 2</strong> of the assistant's prompt. <strong>Always</strong> rules must be executed on every call (e.g. 2-factor ID verification). <strong>Never</strong> rules are strict guardrails (e.g. never give medical advice). <strong>Conditional</strong> rules trigger only when specific circumstances occur. Every policy has a reference ID (e.g. <code>POL-001</code>) allowing precise compliance auditing.</p>
+            </div>
+          </div>
+
+          <!-- Filter Pills -->
+          <div class="flex-gap-2 mb-3">
+            <button class="btn-soft-xs policy-filter-btn active" data-filter="all_enabled">All Enabled</button>
+            <button class="btn-soft-xs policy-filter-btn" data-filter="always">Always Rules</button>
+            <button class="btn-soft-xs policy-filter-btn" data-filter="never">Never Rules</button>
+            <button class="btn-soft-xs policy-filter-btn" data-filter="conditional">Conditional</button>
+            <button class="btn-soft-xs policy-filter-btn" data-filter="draft">Drafts</button>
+            <button class="btn-soft-xs policy-filter-btn" data-filter="disabled">Disabled</button>
+          </div>
+
+          <div class="master-detail-grid">
+            <!-- Left Master: Policies List -->
+            <div class="master-col">
+              <div class="card p-3">
+                <div class="flex-between mb-3">
+                  <span class="text-xs font-bold text-dim">POLICIES (<span id="policies-master-count">0</span>)</span>
+                  <button id="btn-master-add-policy" class="btn-soft-xs">+ Add</button>
+                </div>
+                <div id="policies-master-list" class="assistants-master-list"></div>
+              </div>
+            </div>
+
+            <!-- Right Detail: Policy Editor -->
+            <div class="detail-col">
+              <div id="policies-zero-state" class="empty-card hidden">
+                <div class="empty-icon">📜</div>
+                <h3>No policies found.</h3>
+                <p class="text-muted text-xs">Author compliance rules to ensure your phone assistants follow strict company policies.</p>
+                <button id="btn-empty-start-policy" class="btn-primary-cyan mt-3">+ Create First Policy</button>
+              </div>
+
+              <div id="policy-editor-card" class="card">
+                <div class="flex-between mb-3 border-b pb-2">
+                  <div class="flex-center gap-2">
+                    <span id="policy-ref-id-badge" class="ref-badge ref-badge-pol">POL-001</span>
+                    <div>
+                      <h3 id="policy-editor-title">Edit Policy</h3>
+                      <span id="policy-editor-sub" class="text-xs text-muted">Configure rule directive and condition trigger</span>
+                    </div>
+                  </div>
+                  <div class="flex-center gap-2">
+                    <button id="btn-policy-delete" class="btn-danger-soft">🗑️ Delete</button>
+                    <button id="btn-policy-save" class="btn-primary-cyan">Save Policy</button>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="policy-title-input">Policy Title / Summary</label>
+                  <input type="text" id="policy-title-input" class="input-soft" placeholder="e.g. HIPAA Two-Factor Identity Verification">
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label for="policy-type-select">Rule Type</label>
+                    <select id="policy-type-select" class="select-soft">
+                      <option value="always">Always (Mandatory requirement on every call)</option>
+                      <option value="never">Never (Strict prohibition / guardrail)</option>
+                      <option value="conditional">Conditional (Triggered when specific situation occurs)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="policy-status-select">Status</label>
+                    <select id="policy-status-select" class="select-soft">
+                      <option value="enabled">Enabled (Active in Assistant Prompt)</option>
+                      <option value="draft">Draft (Staged for Review)</option>
+                      <option value="disabled">Disabled (Inactive)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="policy-condition-row" class="form-group hidden">
+                  <label for="policy-condition-input"><strong>Trigger Condition</strong> (WHEN this situation occurs...)</label>
+                  <input type="text" id="policy-condition-input" class="input-soft" placeholder="e.g. When caller requests billing balance or patient medical records...">
+                </div>
+
+                <div class="form-group">
+                  <label for="policy-action-input"><strong>Directive / Action</strong> (<span id="policy-action-label">Mandatory Action</span>)</label>
+                  <textarea id="policy-action-input" class="textarea-soft auto-grow" rows="3" placeholder="State the exact instruction or restriction for the assistant..."></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- TAB 4: 📋 PROCEDURES (WORKFLOWS & INTEGRATED TEST SCENARIOS) -->
+        <!-- ============================================================ -->
+        <section id="pane-procedures" class="tab-pane">
+          <div class="pane-header">
+            <div>
+              <h2>📋 Procedures & Workflow Authorization</h2>
+              <p class="text-muted text-xs">Define authorized step-by-step procedures that constrain tool usage. Assistants politely decline anything outside enabled procedures.</p>
+            </div>
+            <div class="flex-center gap-2">
+              <button id="btn-procedures-nav-new" class="btn-primary-cyan">+ New Procedure</button>
+            </div>
+          </div>
+
+          <!-- Guidance Callout Banner -->
+          <div class="guidance-banner">
+            <span class="guidance-icon">💡</span>
+            <div class="guidance-content">
+              <h4>How Procedures Authorize & Constrain Assistants</h4>
+              <p>Procedures form <strong>Block 3</strong> of the system prompt. Assistants can <em>only</em> perform workflows listed in enabled procedures; if a caller's request falls outside, the assistant strictly and politely declines. Furthermore, procedures authorize specific tools. <strong>Each procedure must have at least 1 test scenario</strong> to certify.</p>
+            </div>
+          </div>
+
+          <!-- Filter Pills -->
+          <div class="flex-gap-2 mb-3">
+            <button class="btn-soft-xs proc-filter-btn active" data-filter="enabled">All Enabled</button>
+            <button class="btn-soft-xs proc-filter-btn" data-filter="draft">Drafts</button>
+            <button class="btn-soft-xs proc-filter-btn" data-filter="all">All Procedures</button>
+          </div>
+
+          <div class="master-detail-grid">
+            <!-- Left Master: Procedures List -->
+            <div class="master-col">
+              <div class="card p-3">
+                <div class="flex-between mb-3">
+                  <span class="text-xs font-bold text-dim">PROCEDURES (<span id="procedures-master-count">0</span>)</span>
+                  <button id="btn-master-add-procedure" class="btn-soft-xs">+ Add</button>
+                </div>
+                <div id="procedures-master-list" class="assistants-master-list"></div>
+              </div>
+            </div>
+
+            <!-- Right Detail: Procedure Editor -->
+            <div class="detail-col">
+              <div id="procedures-zero-state" class="empty-card hidden">
+                <div class="empty-icon">📋</div>
+                <h3>No procedures found.</h3>
+                <p class="text-muted text-xs">Define procedures to authorize workflows and constrain tool execution.</p>
+                <button id="btn-empty-start-procedure" class="btn-primary-cyan mt-3">+ Create First Procedure</button>
+              </div>
+
+              <div id="procedure-editor-card" class="card">
+                <div class="flex-between mb-3 border-b pb-2">
+                  <div class="flex-center gap-2">
+                    <span id="proc-ref-id-badge" class="ref-badge ref-badge-proc">PROC-001</span>
+                    <div>
+                      <h3 id="proc-editor-title">Edit Procedure</h3>
+                      <span id="proc-editor-sub" class="text-xs text-muted">Configure workflow steps, authorized tools, and test scenarios</span>
+                    </div>
+                  </div>
+                  <div class="flex-center gap-2">
+                    <button id="btn-procedure-delete" class="btn-danger-soft">🗑️ Delete</button>
+                    <button id="btn-procedure-save" class="btn-primary-cyan">Save Procedure</button>
+                  </div>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label for="proc-name-input">Procedure Name</label>
+                    <input type="text" id="proc-name-input" class="input-soft" placeholder="e.g. Schedule Clinic Appointment">
+                  </div>
+                  <div class="form-group">
+                    <label for="proc-status-select">Status</label>
+                    <select id="proc-status-select" class="select-soft">
+                      <option value="enabled">Enabled (Active for Calls & Certification)</option>
+                      <option value="draft">Draft (In Authoring / Review)</option>
+                      <option value="disabled">Disabled</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="proc-objective-input">Objective / Trigger Purpose</label>
+                  <textarea id="proc-objective-input" class="textarea-soft auto-grow" rows="2" placeholder="State when this procedure applies (e.g. Caller wants to book or reschedule a clinic visit)..."></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label><strong>Authorized Tools for this Procedure</strong> (Constrains what tools assistant may call)</label>
+                  <div id="proc-tools-checkboxes" class="tools-checkbox-grid mt-1"></div>
+                </div>
+
+                <div class="form-group">
+                  <label for="proc-steps-input"><strong>Step-by-Step Workflow Instructions</strong></label>
+                  <textarea id="proc-steps-input" class="textarea-soft auto-grow" rows="4" placeholder="1. Verify patient identity per POL-001&#10;2. Query open dates via check_clinic_slots&#10;3. Confirm time with caller&#10;4. Book appointment slot..."></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label for="proc-constraints-input">Constraints & Guardrails</label>
+                  <textarea id="proc-constraints-input" class="textarea-soft auto-grow" rows="2" placeholder="e.g. Only schedule within Mon-Fri 8 AM - 5 PM. Minimum 24 hours advance notice."></textarea>
+                </div>
+
+                <!-- Integrated Test Scenarios Section -->
+                <div class="proc-scenarios-box">
+                  <div class="flex-between mb-2">
+                    <div>
+                      <strong>Linked Test Scenarios</strong>
+                      <span class="text-xs text-muted block">Every enabled procedure must have at least 1 test scenario</span>
+                    </div>
+                    <button id="btn-proc-add-scenario" class="btn-soft-xs">+ Add Test Scenario</button>
+                  </div>
+                  <div id="proc-scenarios-list"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- TAB 5: 🤖 ASSISTANTS (MASTER-DETAIL + EMBEDDED CHAT)         -->
+        <!-- ============================================================ -->
+        <section id="pane-assistants" class="tab-pane">
+          <div class="pane-header">
+            <div>
+              <h2>🤖 Virtual Assistants Studio</h2>
+              <p class="text-muted text-xs">Configure phone personas, voice timbre models with 10-second audio previews, and test live in embedded chat.</p>
+            </div>
+            <button id="btn-asst-nav-new" class="btn-primary-cyan">+ New Assistant</button>
+          </div>
+
+          <!-- Guidance Callout Banner -->
+          <div class="guidance-banner">
+            <span class="guidance-icon">💡</span>
+            <div class="guidance-content">
+              <h4>How Assistant Personas & Voices Work</h4>
+              <p>Assistants combine an authentic backstory, voice timbre, and conversational manners with your organization's <strong>Policies</strong> and <strong>Procedures</strong>. Click <strong>"🔊 Preview Voice (10s)"</strong> to hear authentic native speech streamed from Gemini Live.</p>
+            </div>
+          </div>
+
+          <div class="master-detail-grid">
+            <!-- Left Master: Assistants List -->
+            <div class="master-col">
+              <div class="card p-3">
+                <div class="flex-between mb-3">
+                  <span class="text-xs font-bold text-dim">ASSISTANTS (<span id="assistants-total-count">0</span>)</span>
+                  <button id="btn-master-new-asst" class="btn-soft-xs">+ Add</button>
+                </div>
+                <div id="assistants-master-list" class="assistants-master-list"></div>
+              </div>
+            </div>
+
+            <!-- Right Detail: Assistant Form + Embedded Chat Window -->
+            <div class="detail-col">
+              <div id="assistants-zero-state" class="empty-card hidden">
+                <div class="empty-icon">🤖</div>
+                <h3>No assistants created, yet.</h3>
+                <p class="text-muted text-xs">Every organization requires at least one assistant to handle telephone calls.</p>
+                <button id="btn-empty-start-assistant" class="btn-primary-cyan mt-3">Click here to create your first assistant</button>
+              </div>
+
+              <div id="assistant-editor-card" class="card">
+                <div class="flex-between mb-3 border-b pb-2">
+                  <div>
+                    <h3 id="editor-heading">Configure Virtual Assistant</h3>
+                    <span id="editor-subheading" class="text-xs text-muted">Edit persona, voice timbre, and tool access</span>
+                  </div>
+                  <div class="flex-center gap-2">
+                    <button id="btn-editor-delete-asst" class="btn-danger-soft">🗑️ Delete</button>
+                    <button id="btn-editor-save-asst" class="btn-primary-cyan">Save Assistant</button>
+                  </div>
+                </div>
+
+                <!-- AI Prompt box: ONLY visible when creating new -->
+                <div id="editor-ai-creator-box" class="card card-ai-prompt mb-3">
+                  <div class="flex-between mb-2">
+                    <span class="text-xs text-cyan font-bold">✨ Describe Your Perfect Assistant (Creation Only)</span>
+                    <div class="flex-center gap-2">
+                      <button id="btn-skip-ai-creator" class="btn-soft-xs">Skip to Manual</button>
+                    </div>
+                  </div>
+                  <div class="flex-gap-2">
+                    <input type="text" id="editor-describe-asst-input" class="input-soft flex-1" placeholder="e.g. A warm Southern receptionist named Clara who is polite, patient with seniors, and calm under pressure...">
+                    <button id="btn-ai-generate-asst" class="btn-primary-cyan">✨ Generate Persona</button>
+                  </div>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label for="asst-name-input">Assistant Name</label>
+                    <input type="text" id="asst-name-input" class="input-soft" placeholder="e.g. Sarah Lou Jenkins">
+                  </div>
+
+                  <!-- Voice Model Selection with Timbre Clarity & 10s Audio Preview -->
+                  <div class="form-group">
+                    <div class="flex-between mb-1">
+                      <label for="asst-voice-select">Voice Model & Timbre</label>
+                      <button id="btn-preview-voice" class="btn-soft-xs text-cyan" title="Listen to 10-second spoken preview">
+                        🔊 Preview Voice (10s)
+                      </button>
+                    </div>
+                    <select id="asst-voice-select" class="select-soft">
+                      <option value="Aoede">Aoede (Female timbre · Warm, breezy & natural)</option>
+                      <option value="Fenrir">Fenrir (Male timbre · Deep, resonant & authoritative)</option>
+                      <option value="Charon">Charon (Male timbre · Calm, clinical & measured)</option>
+                      <option value="Kore">Kore (Female timbre · Bright, cheerful & energetic)</option>
+                      <option value="Puck">Puck (Male/Neutral timbre · Casual, friendly & conversational)</option>
+                    </select>
+                    <audio id="voice-preview-audio" class="hidden" preload="none"></audio>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="asst-personality-input">Personality Style</label>
+                  <input type="text" id="asst-personality-input" class="input-soft" placeholder="e.g. Southern Charm & Warmth, polite, patient">
+                </div>
+
+                <div class="form-group">
+                  <label for="asst-backstory-input">Backstory & Authentic Context</label>
+                  <textarea id="asst-backstory-input" class="textarea-soft auto-grow" rows="3" placeholder="Describe the assistant's background and authentic context..."></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label><strong>Assigned Tools</strong></label>
+                  <div id="asst-tools-checkboxes" class="tools-checkbox-grid"></div>
+                </div>
+
+                <div class="form-group">
+                  <div class="flex-between mb-2">
+                    <label><strong>Conversational Guidelines & Manners</strong></label>
+                    <button id="btn-asst-add-rule" class="btn-soft-xs">+ Add Guideline</button>
+                  </div>
+                  <div id="asst-rules-list" class="policies-list"></div>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- EMBEDDED CHAT WITH ASSISTANT (WINDOW INSIDE WINDOW)          -->
+                <!-- ============================================================ -->
+                <div class="embedded-chat-container mt-4 pt-3 border-t">
+                  <div class="flex-between mb-2">
+                    <div class="flex-center gap-2">
+                      <span>💬</span>
+                      <strong>Test This Assistant in Live Call / Chat</strong>
+                    </div>
+                    <button id="btn-review-chat-interaction" class="btn-outline-amber text-xs">
+                      🔍 Review Interaction & Scan for Improvements
+                    </button>
+                  </div>
+
+                  <div class="embedded-chat-controls mb-2">
+                    <div class="form-grid-3">
+                      <div class="form-group mb-1">
+                        <label class="text-xs">Scenario Mode</label>
+                        <select id="chat-target-mode" class="select-soft">
+                          <option value="freeform">Freeform Sandbox</option>
+                          <option value="scenario">Bank Test Scenario</option>
+                          <option value="pasted">Custom Pasted Scenario</option>
+                        </select>
+                      </div>
+
+                      <div class="form-group mb-1" id="chat-scenario-select-box">
+                        <label class="text-xs">Select Bank Scenario</label>
+                        <select id="chat-scenario-select" class="select-soft"></select>
+                      </div>
+
+                      <div class="form-group mb-1">
+                        <label class="text-xs">Modality</label>
+                        <div class="mode-switch">
+                          <button class="mode-btn active" id="chat-modality-text" data-mod="text">Text ⚡</button>
+                          <button class="mode-btn" id="chat-modality-voice" data-mod="voice">Voice 🎙️</button>
+                          <button class="mode-btn" id="chat-modality-hybrid" data-mod="hybrid">Hybrid 🔀</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div id="chat-pasted-scenario-box" class="form-group mb-1 hidden">
+                      <label class="text-xs">Paste Scenario / Caller Objective</label>
+                      <textarea id="chat-pasted-input" class="textarea-soft auto-grow" rows="2" placeholder="e.g. Caller is an anxious patient asking about lab test results..."></textarea>
+                    </div>
+
+                    <div class="flex-between mt-2">
+                      <button id="btn-begin-chat" class="btn-primary-cyan">
+                        ▶ Begin Call / Chat
+                      </button>
+                      <button id="btn-reset-chat" class="btn-soft-xs">Reset Chat</button>
+                    </div>
+                  </div>
+
+                  <!-- Chat Feed Window -->
+                  <div class="embedded-chat-window">
+                    <div id="chat-pre-call-banner" class="pre-call-banner">
+                      <span class="text-xs text-muted">Click <strong>"▶ Begin Call / Chat"</strong> to start speaking with this assistant.</span>
+                    </div>
+                    <div id="chat-sparring-feed" class="chat-sparring-feed hidden"></div>
+                    <div id="chat-input-row-box" class="chat-input-bar hidden">
+                      <input type="text" id="chat-user-input" class="input-soft flex-1" placeholder="Speak or type your turn...">
+                      <button id="btn-send-chat" class="btn-primary-cyan">Send</button>
+                    </div>
+                  </div>
+                  <!-- Hidden audio player for assistant speech output -->
+                  <audio id="chat-audio-player" class="hidden"></audio>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- TAB 6: 🏆 CERTIFICATION (HISTORY VS IN-PROGRESS LIVE RUNNER) -->
+        <!-- ============================================================ -->
+        <section id="pane-certification" class="tab-pane">
+          <!-- Sub-View 1: Certification History -->
+          <div id="cert-subview-history">
+            <div class="pane-header">
+              <div>
+                <h2>📜 Certification History & Active Deployments</h2>
+                <p class="text-muted text-xs">Review all past test certification snapshots and manage active production deployments.</p>
+              </div>
+              <button id="btn-cert-nav-new" class="btn-primary-cyan">+ New Certification</button>
+            </div>
+
+            <div class="card mb-3">
+              <div class="flex-between mb-3">
+                <div class="flex-center gap-2">
+                  <span class="text-xs font-bold text-dim">FILTER RUNS:</span>
+                  <div class="filter-pill-bar">
+                    <button class="filter-pill active" data-filter="all">All Runs</button>
+                    <button class="filter-pill" data-filter="passed">Passed Only 🟢</button>
+                    <button class="filter-pill" data-filter="deployed">Active Deployed 🚀</button>
+                    <button class="filter-pill" data-filter="failed">Failed 🔴</button>
+                  </div>
+                </div>
+                <button id="btn-refresh-snapshots" class="btn-soft-xs">Refresh</button>
+              </div>
+              <div id="snapshots-history-list" class="snapshots-history-list"></div>
+            </div>
+          </div>
+
+          <!-- Sub-View 2: New Certification & In-Progress Live Runner -->
+          <div id="cert-subview-new" class="hidden">
+            <div class="pane-header">
+              <div>
+                <h2>🏆 Test Certification Runner</h2>
+                <p class="text-muted text-xs">Run your virtual assistant sequentially through all enabled test scenarios and stream turns live.</p>
+              </div>
+              <button id="btn-cert-cancel-new" class="btn-soft-xs">← View History</button>
+            </div>
+
+            <!-- Parameters Card (Visible when idle) -->
+            <div class="card mb-3" id="cert-params-card">
+              <h3 class="mb-2">Certification Setup</h3>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="cert-target-assistant">Assistant to Certify</label>
+                  <select id="cert-target-assistant" class="select-soft"></select>
+                </div>
+                <div class="form-group">
+                  <label>Execution Mode</label>
+                  <div class="mode-switch">
+                    <button class="mode-btn active" id="btn-cert-mode-text" data-mode="text">Text ⚡ (Fast)</button>
+                    <button class="mode-btn" id="btn-cert-mode-voice" data-mode="voice">Voice 🎙️ (High-Fidelity Telephony)</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex-between mt-2">
+                <span class="text-xs text-muted">Certifies against all enabled test bank scenarios.</span>
+                <button id="btn-snapshot-certify" class="btn-primary-cyan">
+                  🚀 Launch Snapshot & Certify
+                </button>
+              </div>
+            </div>
+
+            <!-- Collapsed In-Progress Status Banner (Visible when running / paused) -->
+            <div class="card p-3 mb-3 in-progress-banner hidden" id="cert-progress-banner">
+              <div class="flex-between">
+                <div class="flex-center gap-3">
+                  <span id="cert-banner-spinner" class="spinner-dot">●</span>
+                  <div>
+                    <div class="font-bold text-sm" id="cert-banner-title">Certification Run In Progress...</div>
+                    <div class="text-xs text-muted" id="cert-banner-sub">Assistant: Sarah Lou | Mode: TEXT | Started: Just now</div>
+                  </div>
+                </div>
+                <div class="flex-center gap-2">
+                  <button id="btn-cert-pause" class="btn-outline-amber">⏸ Pause</button>
+                  <button id="btn-cert-resume" class="btn-primary-cyan hidden">▶ Continue</button>
+                  <button id="btn-cert-restart" class="btn-danger-soft">↺ Restart</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Main Live Grid: Checklist on left, instant streaming inspector on right -->
+            <div class="cert-layout-grid">
+              <div class="card cert-tests-col">
+                <div class="card-title-bar">
+                  <h3>Test Bank Checklist</h3>
+                  <span id="cert-fraction-badge" class="badge-mini">0 / 0</span>
+                </div>
+                <div id="cert-tests-list" class="cert-tests-list"></div>
+              </div>
+
+              <div class="card cert-inspector-col">
+                <div class="flex-between mb-2">
+                  <div>
+                    <h3 id="cert-detail-title">Select a test scenario to inspect</h3>
+                    <span id="cert-detail-sub" class="text-xs text-muted">Click any scenario on the left</span>
+                  </div>
+                  <div class="flex-center gap-2">
+                    <span id="cert-detail-score" class="score-pill badge-untested">--</span>
+                    <span id="cert-detail-status" class="status-pill state-idle">IDLE</span>
+                  </div>
+                </div>
+
+                <div class="audio-player-soft" id="cert-audio-player">
+                  <button id="btn-cert-play-pause" class="btn-icon-soft">▶</button>
+                  <span id="cert-audio-cur" class="time-label">0:00</span>
+                  <div class="scrubber-bar" id="cert-scrubber-track">
+                    <div class="scrubber-fill" id="cert-scrubber-fill"></div>
+                  </div>
+                  <span id="cert-audio-total" class="time-label">0:00</span>
+                </div>
+                <audio id="cert-audio-el" class="hidden" preload="auto"></audio>
+
+                <div id="cert-detail-transcript" class="cert-transcript-feed"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scenario Editor Modal (For Procedures) -->
+  <div id="scenario-modal" class="drawer-overlay hidden">
+    <div class="drawer-panel" style="max-width: 580px;">
+      <div class="drawer-header">
+        <div class="flex-center gap-2">
+          <span>🏦</span>
+          <h3 id="scenario-modal-title">Test Scenario</h3>
+        </div>
+        <button id="btn-close-scenario-modal" class="btn-icon-soft">✕</button>
+      </div>
+
+      <div class="form-group mb-2">
+        <label for="scen-modal-title">Scenario Title</label>
+        <input type="text" id="scen-modal-title" class="input-soft" placeholder="e.g. Schedule Thursday Appointment">
+      </div>
+
+      <div class="form-group mb-2">
+        <label for="scen-modal-role">Customer Role / Persona</label>
+        <input type="text" id="scen-modal-role" class="input-soft" placeholder="e.g. Patient John Smith">
+      </div>
+
+      <div class="form-group mb-2">
+        <label for="scen-modal-objective">Test Objective</label>
+        <textarea id="scen-modal-objective" class="textarea-soft auto-grow" rows="2" placeholder="State goal of test..."></textarea>
+      </div>
+
+      <div class="form-group mb-2">
+        <label for="scen-modal-instructions">Customer Secret Instructions</label>
+        <textarea id="scen-modal-instructions" class="textarea-soft auto-grow" rows="3" placeholder="Secret caller persona instructions..."></textarea>
+      </div>
+
+      <div class="form-group mb-3">
+        <div class="flex-between mb-1">
+          <label><strong>Evaluation Checklist Goals</strong></label>
+          <button id="btn-modal-add-check" class="btn-soft-xs">+ Add Criteria</button>
+        </div>
+        <div id="scen-modal-checklist" class="policies-list"></div>
+      </div>
+
+      <div class="flex-between pt-2 border-t">
+        <button id="btn-modal-delete-scen" class="btn-danger-soft">Delete</button>
+        <button id="btn-modal-save-scen" class="btn-primary-cyan">Save Scenario</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recycle Bin Drawer -->
+  <div id="recycle-bin-drawer" class="drawer-overlay hidden">
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <div class="flex-center gap-2">
+          <span>🗑️</span>
+          <h3>Recycle Bin (Soft-Deleted Items)</h3>
+        </div>
+        <button id="btn-close-recycle-bin" class="btn-icon-soft">✕</button>
+      </div>
+      <p class="text-xs text-muted mb-3">Deleted items are safely retained here. You can restore them or permanently clear them to the audit archive.</p>
+      <div id="recycle-bin-list" class="recycle-bin-list"></div>
+      <div class="drawer-footer">
+        <button id="btn-clear-recycle-bin" class="btn-danger-soft">Clear All to Archive</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

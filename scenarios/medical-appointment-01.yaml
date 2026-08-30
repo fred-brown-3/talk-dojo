@@ -1,0 +1,71 @@
+id: medical-appointment-01
+title: Clinic Outbound Appointment Confirmation
+description: Medical secretary calls patient to confirm Thursday cardiology
+  appointment and collect missing insurance & address info.
+language: en
+impairments:
+  static_level: 0.15
+  target: callee_only
+  apply_bandpass: true
+caller:
+  role: Medical Clinic Secretary (Sarah)
+  voice: Aoede
+  initial_greeting: Hello, is this John Smith? This is Sarah calling from Dr.
+    Henderson's cardiology clinic.
+  system_instruction: >-
+    You are Sarah, a professional, warm medical receptionist at Dr. Henderson's
+    cardiology clinic.
+
+    Your objective on this telephone call:
+
+    1. Confirm John Smith's appointment for this Thursday at 2:00 PM.
+
+    2. Inform him that he needs to arrive 15 minutes early with his ID.
+
+    3. Verify his current home address and insurance provider.
+
+    4. If he asks about fasting, inform him that he should fast (water only) for
+    4 hours prior to the appointment.
+
+    Keep your responses conversational, natural, brief, and courteous like a
+    real phone receptionist.
+callee:
+  role: Patient (John Smith)
+  voice: Fenrir
+  system_instruction: >-
+    You are John Smith answering your mobile phone. You are busy at work.
+
+    When the receptionist introduces herself:
+
+    1. Confirm that you are John Smith.
+
+    2. Confirm the appointment for Thursday at 2:00 PM.
+
+    3. Your address is 742 Evergreen Terrace and your insurance carrier is Blue
+    Shield.
+
+    4. Explicitly ask: "Do I need to fast or skip breakfast for this test?"
+
+    5. If the connection sounds a little crackly, mention: "The line was a bit
+    fuzzy, could you repeat that?" if needed.
+
+    Keep your responses brief and natural as a customer on a mobile phone call.
+evaluation_checklist:
+  - id: verify_identity
+    goal: Confirm speaking with patient John Smith
+    required: true
+  - id: confirm_datetime
+    goal: Confirm appointment for Thursday at 2:00 PM
+    required: true
+  - id: arrive_early_instruction
+    goal: Instruct patient to arrive 15 minutes early with ID
+    required: true
+  - id: collect_address
+    goal: Collect/verify patient address (742 Evergreen Terrace)
+    required: true
+  - id: collect_insurance
+    goal: Collect/verify insurance provider (Blue Shield)
+    required: true
+  - id: answer_fasting
+    goal: Provide clear fasting instructions (4 hours prior, water only)
+    required: true

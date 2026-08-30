@@ -1,0 +1,211 @@
+id: "doctor-who-reschedule-id-verify-08"
+title: "Doctor Who Appointment Rescheduling (Healthcare 2-Identifier Verification & Relative Calendar Sync)"
+description: "Sarah calls patient Johnathan Doe to reschedule an upcoming appointment with Doctor Who using the strict 3-phase outbound healthcare workflow: 1) Neutral introduction asking for the individual by name, 2) Identity verification asking for secondary identifier (DOB) before discussing chart/schedule, and 3) Disclosure and rescheduling only after EHR match, syncing relative calendar slots."
+category: "healthcare_compliance"
+language: "en"
+impairments:
+  static_level: 0.05
+  target: "none"
+  apply_bandpass: true
+
+caller:
+  role: "Clinic Secretary (Sarah)"
+  voice: "Aoede"
+  initial_greeting: "Hello, this is Sarah from Medical Associates Clinic. May I please speak with Johnathan Doe?"
+  system_instruction: |
+    You are Sarah, an administrative medical secretary at Medical Associates Clinic calling patient Johnathan Doe.
+    You must strictly follow the standard Outbound Healthcare Call Workflow:
+
+    PHASE 1: NEUTRAL INTRODUCTION
+    - Greet courteously by stating your first name (Sarah) and clinic name (Medical Associates Clinic), and ask to speak directly with the individual:
+      "Hello, this is Sarah from Medical Associates Clinic. May I please speak with Johnathan Doe?"
+    - STRICT HIPAA RULE: Do NOT mention Doctor Who, health details, appointments, or rescheduling during this introduction.
+
+    PHASE 2: IDENTITY VERIFICATION (2-IDENTIFIER PROTOCOL)
+    - Once the individual confirms they are Johnathan (e.g., "Yes, this is Johnathan" or "Speaking"):
+      Ask for their secondary identifier before proceeding:
+      "Before we discuss your chart or schedule, could you please verify your date of birth for me?"
+    - (If the patient cannot provide DOB, ask for alternative secondary identifier: home street address, ZIP code, or last 4 digits of SSN).
+    - NEVER read the patient's information aloud for a yes/no confirmation. They must state it.
+    - Immediately execute your 'verify_patient_identity' tool with their full name and stated DOB.
+
+    PHASE 3: DISCLOSURE AND RESCHEDULING
+    - ONLY after the tool confirms the details match the electronic health record (EHR), disclose the purpose of the call:
+      "Thank you. Doctor Who has an unexpected schedule change, and we need to move your upcoming appointment."
+    - Execute 'check_doctor_availability' for Doctor Who.
+    - Offer several relative slots:
+      1) "Tomorrow at 2:00 PM"
+      2) "Next Tuesday at 10:00 AM"
+      3) "Next Wednesday at 3:15 PM"
+    - When Johnathan identifies that Next Wednesday at 3:15 PM works for him, execute your 'book_clinic_appointment' tool to lock it in.
+    - Confirm the rescheduled appointment with Doctor Who for Next Wednesday at 3:15 PM, remind him to bring insurance, and conclude politely.
+
+  tools:
+    - name: "verify_patient_identity"
+      description: "Verify patient identity against clinic EHR database using 2-identifier protocol"
+      parameters:
+        type: "OBJECT"
+        properties:
+          full_name:
+            type: "STRING"
+            description: "Full legal first and last name stated by the caller"
+          dob:
+            type: "STRING"
+            description: "Date of birth (Month Day, Year) stated by the caller"
+          secondary_id:
+            type: "STRING"
+            description: "Alternative secondary identifier if DOB unavailable (address, zip, or SSN last 4)"
+        required: ["full_name"]
+
+    - name: "check_doctor_availability"
+      description: "Look up open appointment slots for a specific physician"
+      parameters:
+        type: "OBJECT"
+        properties:
+          doctor_name:
+            type: "STRING"
+            description: "Name of the physician, e.g. 'Doctor Who'"
+        required: ["doctor_name"]
+
+    - name: "book_clinic_appointment"
+      description: "Officially book and lock in an appointment slot in the clinic management database"
+      parameters:
+        type: "OBJECT"
+        properties:
+          doctor_name:
+            type: "STRING"
+          date:
+            type: "STRING"
+            description: "Relative date, e.g. 'Next Wednesday'"
+          time:
+            type: "STRING"
+            description: "Appointment time, e.g. '3:15 PM'"
+          patient_name:
+            type: "STRING"
+        required: ["doctor_name", "date", "time", "patient_name"]
+
+  data:
+    patient_record:
+      full_name: "Johnathan Doe"
+      dob: "March 14, 1985"
+      address: "742 Evergreen Terrace"
+      ssn_last4: "4821"
+      doctor: "Doctor Who"
+    doctor_slots:
+      "Doctor Who":
+        - "Tomorrow at 2:00 PM"
+        - "Next Tuesday at 10:00 AM"
+        - "Next Wednesday at 3:15 PM"
+    booked_appointments: []
+
+callee:
+  role: "Patient (Johnathan 'John' Doe)"
+  voice: "Fenrir"
+  initial_greeting: "Yes, this is Johnathan speaking. How can I help you?"
+  system_instruction: |
+    You are Johnathan 'John' Doe answering your personal phone.
+    You have an appointment with Doctor Who at Medical Associates Clinic.
+
+    PHASE 1 & 2: IDENTITY VERIFICATION
+    1. When Sarah asks for Johnathan Doe, confirm:
+       "Yes, this is Johnathan speaking."
+    2. When Sarah asks to verify your date of birth before discussing your chart:
+       State your date of birth clearly:
+       "Sure, my date of birth is March 14th, 1985."
+       (If asked for secondary address: "742 Evergreen Terrace").
+
+    PHASE 3: CALENDAR NEGOTIATION & TOOL SYNC
+    3. When Sarah discloses that Doctor Who has a schedule change and offers slots:
+       - Say: "Let me check my calendar to see what works."
+       - Execute your 'check_personal_calendar' tool.
+    4. Review your schedule:
+       - Tomorrow afternoon: Busy with a client presentation.
+       - Next Tuesday morning: Busy with a dentist cleaning.
+       - Next Wednesday afternoon: Completely free!
+    5. Explain your conflicts and state that Next Wednesday at 3:15 PM works best for you.
+    6. When Sarah confirms the slot, execute your 'add_personal_calendar_event' tool to lock 'Next Wednesday at 3:15 PM' for Doctor Who into your calendar.
+    7. Thank Sarah and say goodbye.
+
+  tools:
+    - name: "check_personal_calendar"
+      description: "Inspect personal commitments and schedule on mobile phone calendar"
+      parameters:
+        type: "OBJECT"
+        properties:
+          relative_date:
+            type: "STRING"
+            description: "Date to inspect, e.g. 'Tomorrow', 'Next Tuesday', 'Next Wednesday', or 'all'"
+        required: []
+
+    - name: "add_personal_calendar_event"
+      description: "Save a new scheduled event or appointment to personal phone calendar"
+      parameters:
+        type: "OBJECT"
+        properties:
+          date:
+            type: "STRING"
+            description: "Date of the event, e.g. 'Next Wednesday'"
+          time:
+            type: "STRING"
+            description: "Time of the event, e.g. '3:15 PM'"
+          title:
+            type: "STRING"
+            description: "Event title, e.g. 'Doctor Who Appointment'"
+        required: ["date", "time", "title"]
+
+  data:
+    calendar_events:
+      Tomorrow:
+        - time: "1:00 PM - 4:00 PM"
+          title: "Work Client Presentation"
+          busy: true
+      "Next Tuesday":
+        - time: "9:30 AM - 11:30 AM"
+          title: "Dentist Cleaning"
+          busy: true
+      "Next Wednesday":
+        - time: "Afternoon"
+          title: "Completely Open"
+          busy: false
+    calendar_events_saved: []
+
+evaluation_checklist:
+  - id: "neutral_introduction"
+    goal: "Phase 1 Neutral Introduction: Staff introduces themselves by first name (Sarah) and clinic name (Medical Associates Clinic), and asks directly for the individual (Johnathan Doe) without mentioning medical details, appointment, or Doctor Who"
+    required: true
+
+  - id: "callee_confirms_name"
+    goal: "Callee confirms their identity as Johnathan Doe"
+    required: true
+
+  - id: "secondary_id_verification_prompt"
+    goal: "Phase 2 Identity Verification: Staff asks callee to state their secondary identifier (date of birth or address) before discussing chart or schedule, without staff reading it aloud first"
+    required: true
+
+  - id: "callee_states_dob"
+    goal: "Callee states their date of birth (March 14, 1985)"
+    required: true
+
+  - id: "verify_identity_tool_executed"
+    goal: "Staff executes verify_patient_identity tool and confirms match with electronic health record (EHR) before disclosing purpose"
+    required: true
+
+  - id: "disclosure_post_verification"
+    goal: "Phase 3 Disclosure: Staff discloses purpose of call (Doctor Who has schedule change and needs to reschedule) ONLY after identity verification completes"
+    required: true
+
+  - id: "relative_slots_offered"
+    goal: "Staff executes check_doctor_availability and offers multiple relative slots (Tomorrow at 2:00 PM, Next Tuesday at 10:00 AM, Next Wednesday at 3:15 PM)"
+    required: true
+
+  - id: "callee_checks_personal_calendar"
+    goal: "Callee executes check_personal_calendar tool and identifies schedule conflicts before selecting an open time"
+    required: true
+
+  - id: "mutual_slot_agreement"
+    goal: "Both parties agree upon the 'Next Wednesday at 3:15 PM' slot"
+    required: true
+
+  - id: "dual_calendar_sync_identical"
+    goal: "Both agents execute their respective calendar tools (book_clinic_appointment and add_personal_calendar_event) setting the exact same time and slot (Next Wednesday at 3:15 PM)"
+    required: true

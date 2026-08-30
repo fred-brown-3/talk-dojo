@@ -1,0 +1,30 @@
+# Environment variables, credentials, and secrets
+.env
+.env.*
+*.env
+*.key
+*.pem
+
+# Allow example configuration template
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Runtime data, account settings, policies, procedures, test banks, and snapshots
+data/
+data/**
+
+# Test artifacts, call recordings, runs, and audio files
+runs/
+runs/**
+*.wav
+*.pcm
+
+# Operating System and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+npm-debug.log*

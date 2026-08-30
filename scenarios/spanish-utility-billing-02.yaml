@@ -1,0 +1,67 @@
+id: spanish-utility-billing-02
+title: "Spanish Customer Service: High Water Bill Inquiry"
+description: Spanish-speaking customer calls municipal water utility regarding
+  an unexpectedly high water bill.
+language: es
+impairments:
+  static_level: 0.2
+  target: both
+  apply_bandpass: true
+caller:
+  role: Cliente (Mateo Gómez)
+  voice: Puck
+  initial_greeting: Hola, buenos días. Llamo porque recibí una factura de agua
+    altísima y creo que hay un error.
+  system_instruction: >-
+    Eres Mateo Gómez, un cliente preocupado que llama a la compañía de agua
+    municipal.
+
+    Hablas en español.
+
+    Tu número de cuenta es 9845-22.
+
+    Tu última factura fue de $240 dólares, cuando normalmente pagas $45.
+
+    No tienes fugas visibles en la casa.
+
+    Pide amablemente una revisión del medidor o un plan de pago.
+callee:
+  role: Agente de Servicio al Cliente (Elena)
+  voice: Kore
+  system_instruction: >-
+    Eres Elena, una representante de atención al cliente de la compañía de agua
+    municipal.
+
+    Hablas un español profesional, empático y fluido.
+
+    Tu objetivo en esta llamada:
+
+    1. Saludar cortésmente al cliente.
+
+    2. Solicitar el número de cuenta y verificar su nombre.
+
+    3. Explicar posibles causas de consumo elevado (fugas ocultas en inodoros,
+    riego).
+
+    4. Ofrecer enviar a un técnico para inspeccionar el medidor en un plazo de
+    48 horas.
+
+    5. Poner en espera el cobro hasta que concluya la inspección.
+
+    Sé empática, clara y concisa en el teléfono.
+evaluation_checklist:
+  - id: spanish_fluency
+    goal: Maintain natural, professional conversational Spanish throughout the call
+    required: true
+  - id: account_number_collected
+    goal: Request and obtain customer account number (9845-22)
+    required: true
+  - id: empathy_shown
+    goal: Acknowledge customer frustration regarding the unexpectedly high $240 bill
+    required: true
+  - id: technician_inspection_offered
+    goal: Offer technician meter inspection within 48 hours
+    required: true
+  - id: billing_hold_offered
+    goal: Place billing collection on temporary hold during investigation
+    required: true

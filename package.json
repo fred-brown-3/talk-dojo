@@ -1,0 +1,30 @@
+{
+  "name": "talk-dojo",
+  "version": "1.0.0-beta.1",
+  "description": "Enterprise Voice AI Platform & Telephony Simulation Laboratory",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node test/unit-test.js",
+    "test:models": "node test/test-models.js",
+    "test:simulation": "node test/run-simulation.js"
+  },
+  "keywords": [
+    "voice-ai",
+    "gemini",
+    "realtime",
+    "telephony",
+    "audio-switchboard",
+    "simulation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ws": "^8.18.0",
+    "yaml": "^2.7.0"
+  }
+}

@@ -1,0 +1,107 @@
+id: "appointment-scheduling-toolbelts-07"
+title: "Secretary Rescheduling Call (Isolated Calendar Toolbelts)"
+description: "Sarah calls patient John to reschedule. Both agents use private toolbelts during the call: Sarah checks clinic slots and books the appointment, while John checks his personal calendar to find an open time."
+category: "tool_enabled"
+language: "en"
+impairments:
+  static_level: 0.05
+  target: "none"
+  apply_bandpass: true
+
+caller:
+  role: "Clinic Secretary (Sarah)"
+  voice: "Aoede"
+  initial_greeting: "Hello John, this is Sarah from Dr. Patel's clinic. I'm calling because we need to reschedule your Thursday visit. Do you have a moment?"
+  system_instruction: |
+    You are Sarah, an administrative receptionist at Dr. Patel's medical practice.
+    Your mission on this call:
+    1. Explain that Dr. Patel has an emergency procedure and you need to reschedule his Thursday morning appointment to Thursday afternoon or Friday.
+    2. Use your 'check_clinic_slots' tool to look up open afternoon slots.
+    3. Offer the open slots to John.
+    4. When John agrees on a time that works for both of you, use your 'book_appointment' tool to confirm the booking in your system.
+    5. Give John the confirmation details and politely say goodbye.
+    Remember to execute your tools when you need information.
+
+  tools:
+    - name: "check_clinic_slots"
+      description: "Lookup available appointment openings at the medical clinic"
+      parameters:
+        type: "OBJECT"
+        properties:
+          date:
+            type: "STRING"
+            description: "Date to check, e.g. 'Thursday' or 'Friday'"
+        required: ["date"]
+
+    - name: "book_appointment"
+      description: "Confirm and book an appointment slot in the clinic management system"
+      parameters:
+        type: "OBJECT"
+        properties:
+          date:
+            type: "STRING"
+          time:
+            type: "STRING"
+          patient_name:
+            type: "STRING"
+          notes:
+            type: "STRING"
+        required: ["date", "time", "patient_name"]
+
+  data:
+    available_slots:
+      - "Thursday 3:30 PM"
+      - "Thursday 4:15 PM"
+      - "Friday 9:30 AM"
+    booked_appointments: []
+
+callee:
+  role: "Patient (John Doe)"
+  voice: "Fenrir"
+  initial_greeting: "Hi Sarah, sure, I have a moment. What times do you have open?"
+  system_instruction: |
+    You are John Doe answering the phone.
+    You need to reschedule your appointment.
+    When Sarah mentions available times on Thursday afternoon:
+    1. Say: "Let me check my calendar real quick."
+    2. Use your 'check_personal_calendar' tool to view your Thursday schedule.
+    3. Review the events returned: notice you have a team meeting busy until 3:00 PM, but are free after 3:00 PM.
+    4. Propose or accept Thursday at 3:30 PM as the best time for you.
+    5. Thank Sarah once confirmed.
+
+  tools:
+    - name: "check_personal_calendar"
+      description: "Check personal schedule and events on your phone calendar"
+      parameters:
+        type: "OBJECT"
+        properties:
+          day:
+            type: "STRING"
+            description: "Day of the week, e.g. 'Thursday'"
+        required: ["day"]
+
+  data:
+    calendar_events:
+      - time: "1:00 PM - 3:00 PM"
+        title: "Work Quarterly Sync"
+        busy: true
+      - time: "3:00 PM - 5:00 PM"
+        title: "Open Afternoons"
+        busy: false
+
+evaluation_checklist:
+  - id: "state_reschedule_reason"
+    goal: "State that the Thursday appointment needs to be rescheduled"
+    required: true
+  - id: "secretary_checks_slots"
+    goal: "Secretary uses check_clinic_slots tool to find open afternoon openings"
+    required: true
+  - id: "patient_checks_calendar"
+    goal: "Patient uses check_personal_calendar tool before agreeing to a time"
+    required: true
+  - id: "agree_on_thursday_330"
+    goal: "Both parties agree upon the Thursday 3:30 PM slot"
+    required: true
+  - id: "book_confirmed_appointment"
+    goal: "Secretary calls book_appointment tool to finalize the 3:30 PM reservation"
+    required: true
