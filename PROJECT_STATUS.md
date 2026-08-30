@@ -1,9 +1,9 @@
 # Talk Dojo 🥋 — Project Status & Architecture Guide for AI Agents
 
-**Last Updated:** August 29, 2026  
+**Last Updated:** August 30, 2026
 **Repository:** `talk-dojo`  
 **Test Status:** ✅ All 8 unit test suites passing (`npm test`)  
-**Active Dev Server:** `npm run dev` running on `http://localhost:3000`
+**Dev Server:** Run `npm run dev` and open `http://localhost:3000`
 
 ---
 
@@ -13,24 +13,26 @@
 1. Define company identity with dynamic Markdown section cards (`SEC-xxx`), phonetics, acronyms, and contact information.
 2. Author MCP-compatible tools with explicit parameter schemas, example call parameters, expected response schemas, and call responses.
 3. Establish immutable compliance policies (`POL-xxx`) classified as **Always**, **Never**, or **Conditional**.
-4. Define authorized procedures (`PROC-xxx`) that constrain tool usage and require integrated test scenarios.
-5. Build virtual phone assistants with distinct personas, authentic backstories, conversational guidelines, and Gemini Multimodal Live voice timbres (`Aoede`, `Fenrir`, `Charon`, `Kore`, `Puck`) with static-free 10-second audio previews.
-6. Spar live with the assistant inside an embedded voice-first call window where the actual LLM streams native spoken audio.
-7. Certify assistants against all enabled procedures in either ultra-fast Text mode or high-fidelity Voice telephony mode, streaming turns live with interactive **Pause**, **Continue**, and **Restart** controls.
-8. Create immutable configuration snapshots and manage active production deployments with safety audit logs.
+4. Define authorized procedures (`PROC-xxx`) that constrain tool usage at the endpoint/action level.
+5. Author standalone test scenarios (`TEST-xxx`) linked to multiple policies and procedures with proactive coverage-gap detection.
+6. Build virtual phone assistants with distinct personas, authentic backstories, conversational guidelines, and Gemini Multimodal Live voice timbres (`Aoede`, `Fenrir`, `Charon`, `Kore`, `Puck`) with static-free 10-second audio previews.
+7. Spar live with the assistant inside an embedded voice-first call window where the actual LLM streams native spoken audio.
+8. Certify assistants against all enabled standalone scenarios in either ultra-fast Text mode or high-fidelity Voice telephony mode, streaming turns live with interactive **Pause**, **Continue**, and **Restart** controls.
+9. Create immutable configuration snapshots and manage active production deployments with safety audit logs.
 
 ---
 
 ## 2. Navigation Hierarchy & Route Structure
 
-The UI follows an intentional 6-tier sequential hierarchy:
+The UI follows an intentional 7-tier sequential hierarchy:
 ```
 1. 🏢 Account              -> /#/account/:accountId/info
 2. 🛠️ Tools                -> /#/account/:accountId/tools/all?id=<toolId>  |  /#/account/:accountId/tools/new
 3. 📜 Policies             -> /#/account/:accountId/policies/all_enabled?id=<policyId>
 4. 📋 Procedures           -> /#/account/:accountId/procedures/all_enabled?id=<procId>
-5. 🤖 Assistants           -> /#/account/:accountId/assistants/all?id=<asstId>  |  /#/account/:accountId/assistants/new
-6. 🏆 Certification        -> /#/account/:accountId/certification/history  |  /#/account/:accountId/certification/new
+5. 🏦 Test Scenarios       -> /#/account/:accountId/testscenarios/all?id=<testId>
+6. 🤖 Assistants           -> /#/account/:accountId/assistants/all?id=<asstId>  |  /#/account/:accountId/assistants/new
+7. 🏆 Certification        -> /#/account/:accountId/certification/history  |  /#/account/:accountId/certification/new
 ```
 
 ### Hash-Based Deep Linking Convention
@@ -61,13 +63,19 @@ The UI follows an intentional 6-tier sequential hierarchy:
 - Each policy receives a clean reference ID (`POL-001`, `POL-002`, etc.) so violations can be reported directly by ID.
 
 ### D. Procedures Tab (`PROC-xxx`)
-- Dedicated top-level tab between Policies and Assistants.
+- Dedicated top-level tab between Policies and Test Scenarios.
 - Procedures authorize and constrain tool usage with checkboxes.
 - Strict prompt mandate enforces that if a caller request falls outside enabled procedures, the assistant **must politely decline**.
-- Test scenarios are integrated directly into procedure detail views. Every enabled procedure requires at least 1 test scenario to qualify for certification.
-- Integrated scenario editor modal allows authoring caller personas, secret instructions, and checklist criteria.
+- Covering standalone test scenarios are linked from procedure detail views.
+- Granular `authorized_actions` select individual virtual-tool endpoints.
 
-### E. Assistants Studio (`data/accounts/<account-id>/assistants/`)
+### E. Standalone Test Scenarios (`TEST-xxx`)
+- Stored at `data/accounts/<account-id>/test-scenarios/<test-id>.yaml`.
+- Link to multiple policies and procedures and define customer personas, private instructions, and evaluation checklists.
+- Coverage warnings flag enabled policies and procedures not referenced by any enabled scenario.
+- Certification maps linked procedure actions into an isolated assistant toolbelt.
+
+### F. Assistants Studio (`data/accounts/<account-id>/assistants/`)
 - Master-detail view for managing multiple phone personas.
 - **Voice Timbre Clarity & Gemini Live Bidi Previews**:
   - `Aoede`: Female timbre · Warm, breezy & natural (~240 Hz).
@@ -80,7 +88,7 @@ The UI follows an intentional 6-tier sequential hierarchy:
   - Embedded in the assistant edit pane with Freeform Sandbox, Bank Scenario, and Pasted Scenario modes.
   - Modalities: `Text ⚡`, `Voice 🎙️`, `Hybrid 🔀`.
 
-### F. Prompt Compilation: Strict 6-Block Specification
+### G. Prompt Compilation: Strict 6-Block Specification
 When compiling the system prompt for an assistant (`compileAssistantPrompt`), it merges:
 1. `=== BLOCK 1: BUSINESS CONTEXT & COMPANY INFORMATION ===`
 2. `=== BLOCK 2: IMMUTABLE POLICIES & COMPLIANCE RULES ===` (Always, Never, Conditional with `[POL-xxx]`)
@@ -89,13 +97,13 @@ When compiling the system prompt for an assistant (`compileAssistantPrompt`), it
 5. `=== BLOCK 5: CONVERSATIONAL GUIDELINES & TELEPHONY MANNERS ===`
 6. `=== BLOCK 6: TOOL INSTRUCTIONS & CAPABILITIES ===`
 
-### G. Certification & Deployment Manager (`src/certification/certification-manager.js`)
+### H. Certification & Deployment Manager (`src/certification/certification-manager.js`)
 - Snapshots freeze company info, policies (`POL-xxx`), procedures (`PROC-xxx`), virtual tools, assistant, and test results.
-- Certification runner tests across all enabled procedures.
+- Certification runner tests all enabled top-level scenarios.
 - Instant live streaming over WebSocket with Pause, Continue, and Restart controls.
 - Active production deployment management with audit logs.
 
-### H. Recycle Bin & Soft-Delete Archive
+### I. Recycle Bin & Soft-Delete Archive
 - Path: `data/accounts/<account-id>/recycle-bin/`
 - All assistant, tool, policy, and scenario deletions are soft-deleted into the recycle bin.
 - Accessible via the bottom sidebar drawer to restore items or permanently clear them to the audit archive.
@@ -113,7 +121,9 @@ When compiling the system prompt for an assistant (`compileAssistantPrompt`), it
 | `DELETE` | `/api/accounts/:id/policies/:policyId` | Soft-delete policy |
 | `GET/POST` | `/api/accounts/:id/procedures` | List/Save procedures (`PROC-xxx`) |
 | `DELETE` | `/api/accounts/:id/procedures/:procId` | Soft-delete procedure |
-| `POST` | `/api/accounts/:id/procedures/:procId/scenarios` | Save integrated test scenario |
+| `GET/POST` | `/api/accounts/:id/test-scenarios` | List or save standalone test scenarios |
+| `GET` | `/api/accounts/:id/test-scenarios/gaps` | Calculate enabled policy/procedure coverage gaps |
+| `POST` | `/api/accounts/:id/test-scenarios/suggest-links` | Suggest policy and procedure links |
 | `GET/POST` | `/api/accounts/:id/virtual-tools` | List/Save normalized MCP tool endpoints |
 | `POST` | `/api/accounts/:id/virtual-tools/describe` | AI tool generation endpoint |
 | `GET/POST` | `/api/accounts/:id/assistants` | List/Save virtual assistants |

@@ -1,7 +1,7 @@
 # Talk Dojo 🥋 — Agent Handoff Document
 
 **Date**: 2026-08-30  
-**Latest Git Commit**: [`2ac2059`](https://github.com/fred-brown-3/talk-dojo/commit/2ac2059) (`feat: top-level test scenarios, coverage gaps warning, and granular procedure actions`)  
+**Baseline Feature Commit**: [`2ac2059`](https://github.com/fred-brown-3/talk-dojo/commit/2ac2059) (`feat: top-level test scenarios, coverage gaps warning, and granular procedure actions`)
 **Repository**: [https://github.com/fred-brown-3/talk-dojo](https://github.com/fred-brown-3/talk-dojo)  
 **Dev Server**: Runs on `http://localhost:3000` via `node src/server.js` (Unit tests run via `npm test`).
 
@@ -62,24 +62,24 @@ The platform enables companies to define:
 
 ### F. 3 Realistic Domain Seed Accounts Populated
 Pre-populated in `AccountManager.initDefaultSeedAccounts()`:
-1. **Medical Provider**: `Smoky Mountain Health & Urgent Care` (`acct-smk-7b9e2f41`)
-   - Tools: Clinic Scheduling System, Patient Chart & Medical History System
-   - Policies: HIPAA 2-Factor Verification (`POL-001`), Emergency Triage (`POL-002`), Prescriptions (`POL-003`)
+1. **Medical Provider**: `Smoky Mountain Health & Urgent Care` (`acct-med-smoky-mtn` on a fresh install; compatible with an existing `acct-smk-*` account)
+   - Tools: Clinic Scheduling & EHR Service
+   - Policies: HIPAA verification, medical-advice prohibition, emergency triage, and hardship assistance (`POL-001`–`POL-004`)
    - Procedures: Schedule Clinic Appointment (`PROC-001`), Prescription Refill Request (`PROC-002`)
    - Assistants: Sarah Lou Jenkins (Aoede timbre, warm Southern hospitality)
-   - Tests: `TEST-001`, `TEST-002`, `TEST-003`
+   - Tests: `TEST-001`, `TEST-002`
 2. **Law Firm**: `Sterling & Sterling LLP — Civil Litigation & Corporate Law` (`acct-law-sterling`)
-   - Tools: Legal Practice Management API, Court Dockets Calendar
-   - Policies: Attorney-Client Privilege (`POL-101`), Fee Quotes (`POL-102`), Retainer (`POL-103`)
-   - Procedures: New Client Intake (`PROC-101`), Deposition Scheduling (`PROC-102`)
-   - Assistants: Victoria Sterling (Fenrir/measured timbre)
-   - Tests: `TEST-101`, `TEST-102`
+   - Tools: Legal Intake CRM & Conflict Engine
+   - Policies: Disclaimer, conflict clearance, outcome-quote prohibition, and urgent intake (`POL-001`–`POL-004`)
+   - Procedures: Prospective Client Intake (`PROC-001`), Partner Consultation Scheduling (`PROC-002`)
+   - Assistants: Eleanor Vance (Kore timbre)
+   - Tests: `TEST-001`
 3. **Real Estate Firm**: `Vanguard Realty Group & Property Management` (`acct-real-vanguard`)
-   - Tools: MLS Property Database API, Maintenance Work-Order Dispatch API
-   - Policies: Fair Housing Act (`POL-201`), Security Deposits (`POL-202`), Maintenance (`POL-203`)
-   - Procedures: Property Showing Tour Request (`PROC-201`), Emergency Maintenance Dispatch (`PROC-202`)
-   - Assistants: Marcus Vance (Puck timbre, upbeat real estate specialist)
-   - Tests: `TEST-201`, `TEST-202`
+   - Tools: MLS Property & Showing Dispatch
+   - Policies: Fair housing, brokerage disclosure, and seller-price confidentiality (`POL-001`–`POL-003`)
+   - Procedures: Property Showing Tour Request (`PROC-001`), Listing Consultation Dispatch (`PROC-002`)
+   - Assistants: Chloe Bennett (Puck timbre)
+   - Tests: `TEST-001`
 
 ---
 
@@ -97,19 +97,16 @@ Pre-populated in `AccountManager.initDefaultSeedAccounts()`:
 
 ---
 
-## 4. Next Steps for Incoming Agent
+## 4. Handoff Completion Update
 
-1. **Routing Alias Polish**:
-   - In `public/js/app.js` (`switchTab` / `parseHashRoute`), normalize tab identifiers (e.g. support both `testscenarios` and `test-scenarios` by stripping hyphens: `tabId.replace(/-/g, '')`).
-2. **Tab Display Classes**:
-   - Verify that `#pane-testscenarios` has class `tab-pane` and its visibility is controlled via `.tab-pane.active` (remove any leftover `hidden` class from its initial markup).
-3. **Live Browser Verification**:
-   - Start the server (`node src/server.js` or manage task).
-   - Open `http://localhost:3000` in the browser subagent.
-   - Switch between the 3 accounts (`Smoky Mountain`, `Sterling & Sterling`, `Vanguard Realty`).
-   - Open `Test Scenarios`: verify scenarios load, click `✨ AI Suggest Links`, and verify gap badges update dynamically.
-   - Open `Procedures`: verify granular tool action checkboxes toggle and save properly.
-   - Open `Assistants`: confirm Sarah Lou Jenkins opens with persona generator hidden and tools section removed.
-4. **Push Updates**:
-   - Run `npm test`.
-   - Commit and push to GitHub.
+Completed on 2026-08-30:
+
+1. Normalized `testscenarios` and `test-scenarios` hash-route aliases.
+2. Removed the stale `hidden` class that prevented the Test Scenarios pane from displaying.
+3. Connected granular procedure actions to prompt compilation and certification runtime toolbelts.
+4. Converted standalone customer roles and secret instructions into the runtime caller/callee schema.
+5. Removed obsolete test-bank routes and updated remediation to use top-level scenario and policy stores.
+6. Hardened `TEST-xxx` allocation against overwriting a higher existing ID after deletions.
+7. Added regression coverage for standalone scenarios, coverage gaps, runtime action mapping, and private customer instructions.
+
+Automated and browser verification results should be recorded with the completing commit.

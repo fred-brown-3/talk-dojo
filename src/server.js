@@ -6,7 +6,6 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { config } from './config.js';
 import { CallSession } from './session/call-session.js';
 import { AccountManager } from './account/account-manager.js';
-import { MassTestGenerator } from './generators/mass-test-generator.js';
 import { BatchRunner } from './runner/batch-runner.js';
 import { VirtualToolManager } from './tools/virtual-tool-manager.js';
 import { CertificationManager } from './certification/certification-manager.js';
@@ -23,7 +22,6 @@ await accountManager.init();
 let runtimeApiKey = config.geminiApiKey;
 let activeSession = null;
 
-const massTestGenerator = new MassTestGenerator(runtimeApiKey);
 const batchRunner = new BatchRunner({ accountManager, apiKey: runtimeApiKey });
 const virtualToolManager = new VirtualToolManager();
 const certificationManager = new CertificationManager(accountManager);
@@ -68,7 +66,6 @@ app.post('/api/config/key', (req, res) => {
   const { apiKey } = req.body;
   if (apiKey && typeof apiKey === 'string') {
     runtimeApiKey = apiKey.trim();
-    massTestGenerator.apiKey = runtimeApiKey;
     batchRunner.apiKey = runtimeApiKey;
     res.json({ success: true, hasApiKey: true });
   } else {
@@ -767,127 +764,6 @@ Be concise, encouraging, structured, and helpful. Always give practical examples
   }
 });
 
-// --- TEST BANKS & TESTS API ---
-
-app.get('/api/accounts/:id/test-banks', async (req, res) => {
-  try {
-    const banks = await accountManager.listTestBanks(req.params.id);
-    res.json(banks);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/accounts/:id/test-banks/:bankId/tests', async (req, res) => {
-  try {
-    const assistantId = req.query.assistantId || null;
-    const tests = await accountManager.listTests(req.params.id, req.params.bankId, assistantId);
-    res.json(tests);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/accounts/:id/test-banks/:bankId/tests/:testId', async (req, res) => {
-  try {
-    const test = await accountManager.getTest(req.params.id, req.params.bankId, req.params.testId);
-    res.json(test);
-  } catch (err) {
-    res.status(404).json({ error: 'Test not found' });
-  }
-});
-
-app.post('/api/accounts/:id/test-banks/:bankId/tests', async (req, res) => {
-  try {
-    const test = await accountManager.saveTest(req.params.id, req.params.bankId, req.body);
-    res.json(test);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.patch('/api/accounts/:id/test-banks/:bankId/tests/:testId/toggle', async (req, res) => {
-  try {
-    const { enabled } = req.body;
-    const test = await accountManager.toggleTestEnabled(req.params.id, req.params.bankId, req.params.testId, enabled);
-    res.json(test);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/accounts/:id/test-banks/:bankId/tests/:testId/copy', async (req, res) => {
-  try {
-    const copy = await accountManager.copyTest(req.params.id, req.params.bankId, req.params.testId);
-    res.json(copy);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.patch('/api/accounts/:id/test-banks/:bankId/tests/:testId/rename', async (req, res) => {
-  try {
-    const { title } = req.body;
-    const updated = await accountManager.renameTest(req.params.id, req.params.bankId, req.params.testId, title);
-    res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/accounts/:id/test-banks/:bankId/tests/:testId', async (req, res) => {
-  try {
-    const result = await accountManager.deleteTest(req.params.id, req.params.bankId, req.params.testId);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// --- MASS TEST GENERATOR & DRAFTS API ---
-
-app.post('/api/accounts/:id/test-banks/:bankId/generate', async (req, res) => {
-  try {
-    const { prompt, assistantId, count = 4 } = req.body;
-    const account = await accountManager.getAccount(req.params.id);
-    const assistant = assistantId ? await accountManager.getAssistant(req.params.id, assistantId) : null;
-
-    const generated = await massTestGenerator.generateSuite({ prompt, account, assistant, count });
-    // Save generated suite as drafts
-    const savedDrafts = await accountManager.saveDrafts(req.params.id, req.params.bankId, generated);
-    res.json({ success: true, count: savedDrafts.length, drafts: savedDrafts });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/accounts/:id/test-banks/:bankId/drafts', async (req, res) => {
-  try {
-    const drafts = await accountManager.listDrafts(req.params.id, req.params.bankId);
-    res.json(drafts);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/accounts/:id/test-banks/:bankId/drafts/:draftId/promote', async (req, res) => {
-  try {
-    const promoted = await accountManager.promoteDraftToTest(req.params.id, req.params.bankId, req.params.draftId);
-    res.json({ success: true, test: promoted });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/accounts/:id/test-banks/:bankId/drafts/:draftId', async (req, res) => {
-  try {
-    const result = await accountManager.discardDraft(req.params.id, req.params.bankId, req.params.draftId);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // --- RECYCLE BIN & ARCHIVE API ---
 
 app.get('/api/accounts/:id/recycle-bin', async (req, res) => {
@@ -946,24 +822,21 @@ app.post('/api/accounts/:id/batch-run/abort', (req, res) => {
 
 app.post('/api/remediation/apply', async (req, res) => {
   try {
-    const { accountId, assistantId, testId, fixType, target, patch } = req.body;
+    const { accountId, testId, fixType, patch } = req.body;
 
     if (fixType === 'POLICY_AMENDMENT') {
-      const account = await accountManager.getAccount(accountId);
-      if (!account) return res.status(404).json({ error: 'Account not found' });
-      if (!Array.isArray(account.policies)) account.policies = [];
-      account.policies.push(patch);
-      await accountManager.saveAccount(account);
+      if (!patch || typeof patch !== 'object') return res.status(400).json({ error: 'Policy patch is required' });
+      await accountManager.savePolicy(accountId, patch);
       return res.json({ success: true, message: 'Policy amendment successfully applied to account!' });
     }
 
     if (fixType === 'SCENARIO_CORRECTION') {
-      const test = await accountManager.getTest(accountId, 'default-bank', testId);
+      const test = await accountManager.getTest(accountId, testId);
       if (!test) return res.status(404).json({ error: 'Test scenario not found' });
       if (typeof patch === 'object') {
         Object.assign(test, patch);
       }
-      await accountManager.saveTest(accountId, 'default-bank', test);
+      await accountManager.saveTest(accountId, test);
       return res.json({ success: true, message: 'Scenario correction successfully applied!' });
     }
 

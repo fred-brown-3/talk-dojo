@@ -337,6 +337,7 @@ class TalkDojoEnterpriseApp {
   // --- HASH-BASED DEEP LINKING ROUTER WITH TOP-LEVEL ACCOUNT GUID ---
 
   navigate(tab, sub = 'all', id = null) {
+    tab = this.normalizeTabId(tab);
     const accId = this.activeAccountId || 'default';
     let hash = `#/account/${accId}`;
     if (tab === 'account') {
@@ -346,6 +347,10 @@ class TalkDojoEnterpriseApp {
     }
     if (id) hash += `?id=${encodeURIComponent(id)}`;
     window.location.hash = hash;
+  }
+
+  normalizeTabId(tab = 'account') {
+    return tab.replace(/-/g, '').toLowerCase();
   }
 
   parseHashRoute() {
@@ -366,11 +371,11 @@ class TalkDojoEnterpriseApp {
         tab = 'account';
         sub = 'info';
       } else {
-        tab = parts[2];
+        tab = this.normalizeTabId(parts[2]);
         sub = parts[3] || (parts[2] === 'policies' ? 'all_enabled' : 'all');
       }
     } else {
-      tab = parts[0] || 'account';
+      tab = this.normalizeTabId(parts[0] || 'account');
       sub = parts[1] || (tab === 'policies' ? 'all_enabled' : 'all');
     }
 
@@ -599,6 +604,7 @@ class TalkDojoEnterpriseApp {
   }
 
   switchTab(tabId, sub = 'all', id = null, updateHash = true) {
+    tabId = this.normalizeTabId(tabId);
     this.activeTab = tabId;
     this.activeSub = sub;
 

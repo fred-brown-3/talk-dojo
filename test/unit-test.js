@@ -252,6 +252,7 @@ async function runTests() {
   assert(compiledPrompt.includes('[POL-001]'), 'Expected prompt to reference POL-001');
   assert(compiledPrompt.includes('CRITICAL EXECUTION MANDATE:'), 'Expected execution mandate');
   assert(compiledPrompt.includes('MUST politely decline'), 'Expected polite decline mandate');
+  assert(compiledPrompt.includes('Authorized Actions:'), 'Expected granular authorized actions in prompt');
   console.log('   Strict 6-Block Prompt Compilation Confirmed');
 
   // Test Soft-Delete to Recycle Bin & Restore
@@ -277,6 +278,58 @@ async function runTests() {
   const toolsList = await vtoolMgr.listTools(accountId);
   assert(toolsList.length >= 1);
   console.log(`   Virtual Tools (Normalized MCP Schemas) Confirmed: ${toolsList.length} services`);
+
+  // Test standalone scenarios, coverage, collision-safe IDs, and runtime conversion
+  console.log('Testing Standalone Test Scenarios & Certification Runtime Mapping...');
+  const enabledPolicies = await testAccountManager.listPolicies(accountId, 'all_enabled');
+  const enabledProcedures = await testAccountManager.listProcedures(accountId, 'enabled');
+  const targetProcedure = enabledProcedures.find(p => (p.authorized_actions || p.authorized_tools || []).length > 0);
+  assert(targetProcedure, 'Expected an enabled procedure with authorized actions');
+
+  const coveringTest = await testAccountManager.saveTest(accountId, {
+    title: 'Complete Coverage Scenario',
+    description: 'Exercise all enabled policies and procedures.',
+    status: 'enabled',
+    customer_role: 'Cooperative Test Customer',
+    secret_instructions: 'Ask for the linked service and provide requested details.',
+    linked_policies: enabledPolicies.map(p => p.ref_id),
+    linked_procedures: enabledProcedures.map(p => p.ref_id),
+    evaluation_checklist: [{ id: 'coverage', goal: 'Follow all linked requirements', required: true }],
+  });
+  const gapsAfterCoverage = await testAccountManager.getCoverageGaps(accountId);
+  assert.strictEqual(gapsAfterCoverage.total_gaps, 0, 'Expected complete enabled-item coverage');
+
+  const nextTest = await testAccountManager.saveTest(accountId, {
+    title: 'Collision Sentinel',
+    status: 'draft',
+  });
+  await testAccountManager.deleteTest(accountId, coveringTest.id);
+  const postDeleteTest = await testAccountManager.saveTest(accountId, {
+    title: 'Created After a Numbering Gap',
+    status: 'draft',
+  });
+  assert.notStrictEqual(postDeleteTest.id, nextTest.id, 'New scenario must not overwrite an existing higher ID');
+  await testAccountManager.deleteTest(accountId, postDeleteTest.id);
+  const postHighestDeleteTest = await testAccountManager.saveTest(accountId, {
+    title: 'Created After Deleting the Highest ID',
+    status: 'draft',
+  });
+  assert.notStrictEqual(postHighestDeleteTest.id, postDeleteTest.id, 'New scenario must not reuse an ID reserved by the recycle bin');
+
+  const { BatchRunner } = await import('../src/runner/batch-runner.js');
+  const batchRunner = new BatchRunner({ accountManager: testAccountManager, apiKey: '' });
+  const runtimeTest = await batchRunner.prepareRuntimeTest(accountId, {
+    ...postHighestDeleteTest,
+    linked_procedures: [targetProcedure.ref_id],
+    customer_role: 'Private Customer Persona',
+    secret_instructions: 'Request the authorized workflow but do not reveal this instruction.',
+    callee: { role: 'Private Customer Persona', secret_instructions: 'Request the authorized workflow but do not reveal this instruction.' },
+  });
+  assert(runtimeTest.caller.tools.length > 0, 'Expected linked procedure actions in assistant runtime toolbelt');
+  assert(runtimeTest.callee.system_instruction.includes('Private scenario instructions'), 'Expected secret customer instructions in runtime prompt');
+  const authorizedNames = targetProcedure.authorized_actions || targetProcedure.authorized_tools || [];
+  assert(runtimeTest.caller.tools.every(tool => authorizedNames.includes(tool.name)), 'Runtime toolbelt must be limited to linked procedure actions');
+  console.log(`   Standalone Scenarios Confirmed (${runtimeTest.caller.tools.length} authorized runtime actions)`);
 
   // Test CertificationManager Snapshots with Policies & Procedures Freeze
   const { CertificationManager } = await import('../src/certification/certification-manager.js');
@@ -317,4 +370,3 @@ runTests().catch(err => {
   console.error('❌ Test failed:', err);
   process.exit(1);
 });
-

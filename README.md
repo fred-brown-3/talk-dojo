@@ -26,13 +26,17 @@ Talk Dojo is an enterprise voice-to-voice testing laboratory, sparring arena, an
   - **Conditional**: Triggered directives with explicit condition triggers and mandatory actions.
 - **Reference Identifiers**: Each policy receives a clean ID (`POL-001`, `POL-002`, etc.) allowing exact violation reporting and auditing.
 
-### 4. 📋 Procedures with Tool Constraints & Integrated Test Scenarios (`PROC-xxx`)
+### 4. 📋 Procedures with Granular Tool Actions (`PROC-xxx`)
 - **Authorized Workflows**: Define step-by-step instructions that assistants are permitted to handle on phone calls.
-- **Tool Authorization**: Checkbox governance authorizes only specific tools per procedure.
+- **Action Authorization**: Checkbox governance authorizes specific endpoints/actions per procedure.
 - **Out-of-Scope Declination Mandate**: If a caller request falls outside enabled procedures, the assistant strictly and politely declines.
-- **Integrated Test Scenarios**: Every enabled procedure requires $\ge 1$ test scenario with caller personas, secret instructions, and evaluation criteria.
 
-### 5. 🤖 Virtual Assistants Studio & Gemini Live Audio Previews
+### 5. 🏦 Standalone Test Scenarios & Coverage (`TEST-xxx`)
+- **Multi-Target Links**: Each scenario can validate multiple policies and procedures.
+- **Coverage Detection**: Enabled policies and procedures without an enabled test are highlighted as gaps.
+- **Certification Runtime Mapping**: Linked procedure actions become the assistant's isolated test toolbelt, while customer personas receive private roleplay instructions.
+
+### 6. 🤖 Virtual Assistants Studio & Gemini Live Audio Previews
 - **Authentic Personas**: Configure names, backstories, personality styles, and conversational guidelines.
 - **Gemini Live Bidi WebSocket Audio Previews**: Streams native audio directly from Google's Gemini Live API (`gemini-2.5-flash-native-audio-latest`), cached on disk in `data/voice-previews/` for static-free, zero-latency 10-second previews across all 5 voices:
   - `Aoede`: Warm, breezy & natural female timbre (~240 Hz).
@@ -42,13 +46,13 @@ Talk Dojo is an enterprise voice-to-voice testing laboratory, sparring arena, an
   - `Puck`: Casual, friendly & conversational neutral timbre (~175 Hz).
 - **Embedded Voice-First Sparring Window**: Spar directly with your assistant using microphone or text inside an embedded call container, complete with AI Referee evaluation scoring.
 
-### 6. 🏆 Sequential Certification Runner & Production Deployments
-- **Full Test Suite Certification**: Runs assistants sequentially across all enabled procedures in either ultra-fast Text mode or high-fidelity Voice telephony mode.
+### 7. 🏆 Sequential Certification Runner & Production Deployments
+- **Full Test Suite Certification**: Runs assistants sequentially across all enabled standalone scenarios in either ultra-fast Text mode or high-fidelity Voice telephony mode.
 - **Interactive Live Controls**: Includes **⏸ Pause**, **▶ Continue**, and **↺ Restart** controls.
 - **Instant Turn-by-Turn Streaming**: WebSocket emits turns live; clicking any test in the checklist displays transcript turns and audio immediately.
 - **Frozen Snapshots & Active Deployments**: Freezes company info, policies, procedures, tools, and assistant configurations into deployable snapshots with audit logs.
 
-### 7. 📞 Telephony DSP & Line Impairment Engine
+### 8. 📞 Telephony DSP & Line Impairment Engine
 - Injects configurable telephone line static, pink noise, high-frequency hiss, and micro-crackles on the Caller channel, Callee channel, or both.
 - Optional PSTN Landline Bandpass filter (300 Hz – 3.4 kHz) simulating copper telephone wire frequency response.
 - Procedural acoustic synthesis for standard North American dial tones, ringback tones, connect clicks, and disconnect beeps.
@@ -63,8 +67,9 @@ Talk Dojo uses parent account GUIDs for deep linking across all views:
 2. 🛠️ Tools                -> /#/account/:accountId/tools/all?id=<toolId>  |  /#/account/:accountId/tools/new
 3. 📜 Policies             -> /#/account/:accountId/policies/all_enabled?id=<policyId>
 4. 📋 Procedures           -> /#/account/:accountId/procedures/all_enabled?id=<procId>
-5. 🤖 Assistants           -> /#/account/:accountId/assistants/all?id=<asstId>  |  /#/account/:accountId/assistants/new
-6. 🏆 Certification        -> /#/account/:accountId/certification/history  |  /#/account/:accountId/certification/new
+5. 🏦 Test Scenarios       -> /#/account/:accountId/testscenarios/all?id=<testId> | /#/account/:accountId/testscenarios/new
+6. 🤖 Assistants           -> /#/account/:accountId/assistants/all?id=<asstId>  |  /#/account/:accountId/assistants/new
+7. 🏆 Certification        -> /#/account/:accountId/certification/history  |  /#/account/:accountId/certification/new
 ```
 
 Sharing any URL automatically opens the exact account context, tab, sub-filter, and selected entity.
@@ -141,6 +146,8 @@ Testing Procedures with Tool Authorization & Scenarios (PROC-xxx)...
    Recycle Bin Soft-Delete Confirmed (1 items in bin)
    Recycle Bin Item Restored Successfully
    Virtual Tools (Normalized MCP Schemas) Confirmed: 2 services
+Testing Standalone Test Scenarios & Certification Runtime Mapping...
+   Standalone Scenarios Confirmed (2 authorized runtime actions)
    Certification Snapshots & Active Deployment History Confirmed
 ✅ ALL TESTS PASSED SUCCESSFULLY!
 ```
@@ -155,10 +162,9 @@ Testing Procedures with Tool Authorization & Scenarios (PROC-xxx)...
 
 ---
 
-## 📋 Integrated Test Scenarios & Certification
+## 🏦 Standalone Test Scenarios & Certification
 
-Test scenarios are integrated directly inside **Procedures** (`PROC-xxx`):
-- Each procedure authorizes and constrains tool usage while requiring at least 1 test scenario.
-- Test scenarios define the customer role, secret instructions, and evaluation criteria (e.g. 2-factor HIPAA patient identity verification, multi-endpoint scheduling, dual calendar synchronization).
-- The Certification runner automatically compiles and tests scenarios across all enabled procedures to validate that assistants adhere strictly to authorized workflows and politely decline unmapped actions.
-
+Test scenarios are stored independently under each account and link to one or more **Policies** (`POL-xxx`) and **Procedures** (`PROC-xxx`):
+- Coverage warnings identify enabled policies or procedures without an enabled scenario.
+- Scenarios define the customer role, private instructions, and objective evaluation criteria.
+- Certification runs all enabled top-level scenarios and exposes only actions authorized by their linked procedures.

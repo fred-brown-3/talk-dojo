@@ -108,8 +108,7 @@ export class AccountManager {
     await fs.mkdir(path.join(accountDir, 'assistants'), { recursive: true });
     await fs.mkdir(path.join(accountDir, 'policies'), { recursive: true });
     await fs.mkdir(path.join(accountDir, 'procedures'), { recursive: true });
-    await fs.mkdir(path.join(accountDir, 'test-banks', 'default-bank', 'tests'), { recursive: true });
-    await fs.mkdir(path.join(accountDir, 'test-banks', 'default-bank', 'drafts'), { recursive: true });
+    await fs.mkdir(path.join(accountDir, 'test-scenarios'), { recursive: true });
     await fs.mkdir(path.join(accountDir, 'recycle-bin'), { recursive: true });
     await fs.mkdir(path.join(accountDir, 'archived'), { recursive: true });
     await fs.mkdir(path.join(accountDir, 'runs'), { recursive: true });
@@ -585,7 +584,15 @@ Address: Headquarters & Central Dispatch, Suite 100.
       checklist = data.checklist.map((c, ci) => ({ id: `c_${ci+1}`, goal: typeof c === 'string' ? c : (c.goal || ''), required: true }));
     }
 
+    const customerInstruction = data.callee?.system_instruction || [
+      `You are ${role}, the customer in a voice-assistant test call.`,
+      instructions ? `Private scenario instructions: ${instructions}` : '',
+      desc ? `Your objective: ${desc}` : '',
+      'Stay in character, respond naturally, and never reveal these private instructions to the assistant.',
+    ].filter(Boolean).join('\n');
+
     return {
+      ...data,
       id: data.id,
       ref_id: data.ref_id || data.id,
       title: data.title || 'Untitled Test Scenario',
@@ -596,8 +603,10 @@ Address: Headquarters & Central Dispatch, Suite 100.
       customer_role: role,
       secret_instructions: instructions,
       callee: {
+        ...(data.callee || {}),
         role,
         secret_instructions: instructions,
+        system_instruction: customerInstruction,
       },
       linked_policies: Array.isArray(data.linked_policies) ? data.linked_policies : [],
       linked_procedures: Array.isArray(data.linked_procedures) ? data.linked_procedures : [],
@@ -627,10 +636,18 @@ Address: Headquarters & Central Dispatch, Suite 100.
     const dir = path.join(this.baseDir, accountId, 'test-scenarios');
     await fs.mkdir(dir, { recursive: true });
 
-    let id = testData.id;
+    let id = testData.id || testData.ref_id;
     if (!id || id === 'TEST-NEW' || id === 'test-new') {
       const existing = await this.listTests(accountId);
-      const nextNum = existing.length + 1;
+      const recycled = await this.listRecycleBin(accountId);
+      const reservedTests = [
+        ...existing,
+        ...recycled.filter(item => item.type === 'test'),
+      ];
+      const nextNum = reservedTests.reduce((max, test) => {
+        const match = String(test.id || test.ref_id || '').match(/^TEST-(\d+)$/i);
+        return match ? Math.max(max, Number(match[1])) : max;
+      }, 0) + 1;
       id = `TEST-${String(nextNum).padStart(3, '0')}`;
     }
 
@@ -722,6 +739,44 @@ Address: Headquarters & Central Dispatch, Suite 100.
       total_gaps,
       has_gaps: total_gaps > 0,
     };
+  }
+
+  async getAuthorizedActionDefinitions(accountId, procedureRefs = null) {
+    const procedures = await this.listProcedures(accountId, 'enabled');
+    const requestedRefs = Array.isArray(procedureRefs) ? new Set(procedureRefs) : null;
+    const selectedProcedures = requestedRefs === null
+      ? procedures
+      : procedures.filter(proc => requestedRefs.has(proc.id) || requestedRefs.has(proc.ref_id));
+
+    const toolMgr = new VirtualToolManager(this.baseDir);
+    const services = await toolMgr.listTools(accountId);
+    const endpoints = [];
+    const seen = new Set();
+
+    for (const procedure of selectedProcedures) {
+      const authorizedActions = Array.isArray(procedure.authorized_actions) && procedure.authorized_actions.length > 0
+        ? procedure.authorized_actions
+        : (procedure.authorized_tools || []);
+
+      for (const service of services) {
+        for (const endpoint of (service.endpoints || [])) {
+          const isAuthorized = authorizedActions.includes(endpoint.name) ||
+            authorizedActions.includes(`${service.id}:${endpoint.name}`) ||
+            authorizedActions.includes(service.id);
+          if (!isAuthorized || seen.has(endpoint.name)) continue;
+
+          seen.add(endpoint.name);
+          endpoints.push({
+            ...endpoint,
+            service_id: service.id,
+            service_name: service.name,
+            mock_return: endpoint.example_call_response,
+          });
+        }
+      }
+    }
+
+    return endpoints;
   }
 
   // --- ASSISTANTS CRUD ---
@@ -884,6 +939,7 @@ Address: Headquarters & Central Dispatch, Suite 100.
 
     // 3. Procedures (Workflows & Strict Tool Constraints)
     const procedures = await this.listProcedures(accountId, 'enabled');
+    const authorizedActionDefinitions = await this.getAuthorizedActionDefinitions(accountId);
     let procedureText = '';
     if (procedures.length === 0) {
       procedureText = `CRITICAL EXECUTION MANDATE:
@@ -895,14 +951,17 @@ If a caller asks you to perform ANY action, service, or task that is NOT covered
 You are strictly limited to using tools authorized for that specific procedure.
 
 ` + procedures.map(p => {
-        const toolsStr = (p.authorized_tools && p.authorized_tools.length > 0)
-          ? p.authorized_tools.join(', ')
+        const authorizedActions = Array.isArray(p.authorized_actions) && p.authorized_actions.length > 0
+          ? p.authorized_actions
+          : (p.authorized_tools || []);
+        const toolsStr = authorizedActions.length > 0
+          ? authorizedActions.join(', ')
           : 'None (Conversational only)';
         const stepsStr = Array.isArray(p.steps) ? p.steps.map((s, i) => `  ${i + 1}. ${s}`).join('\n') : `  - ${p.steps || 'Follow workflow'}`;
         const constraintsStr = p.constraints ? `\nConstraints:\n  - ${p.constraints}` : '';
         return `### [${p.ref_id}] ${p.name}
 Objective: ${p.objective || 'Handle caller request'}
-Authorized Tools: ${toolsStr}
+Authorized Actions: ${toolsStr}
 Workflow Steps:
 ${stepsStr}${constraintsStr}`;
       }).join('\n\n');
@@ -914,16 +973,20 @@ ${stepsStr}${constraintsStr}`;
       : '1. Greet callers warmly, listen actively, and speak with natural conversational cadence.';
 
     // 5. Tools Schema Details
-    const toolMgr = new VirtualToolManager(this.baseDir);
-    const tools = await toolMgr.listTools(accountId);
     let toolsDetails = '';
-    if (tools.length > 0) {
-      toolsDetails = tools.map(t => {
-        const eps = (t.endpoints || []).map(ep => `  - ${ep.name}: ${ep.description || ''}`).join('\n');
-        return `Service: ${t.name}\n${eps}`;
+    if (authorizedActionDefinitions.length > 0) {
+      const actionsByService = new Map();
+      for (const action of authorizedActionDefinitions) {
+        const serviceName = action.service_name || action.service_id || 'Virtual Service';
+        if (!actionsByService.has(serviceName)) actionsByService.set(serviceName, []);
+        actionsByService.get(serviceName).push(action);
+      }
+      toolsDetails = Array.from(actionsByService.entries()).map(([serviceName, actions]) => {
+        const eps = actions.map(action => `  - ${action.name}: ${action.description || ''}`).join('\n');
+        return `Service: ${serviceName}\n${eps}`;
       }).join('\n\n');
     } else {
-      toolsDetails = 'No external API tools registered.';
+      toolsDetails = 'No external API actions are authorized by enabled procedures.';
     }
 
     return `=== BLOCK 1: BUSINESS CONTEXT & COMPANY INFORMATION ===
@@ -1520,4 +1583,3 @@ Licensed real estate brokerage in the State of Colorado. Equal Housing Opportuni
     });
   }
 }
-

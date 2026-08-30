@@ -213,9 +213,41 @@ export class BatchRunner extends EventEmitter {
   }
 
   /**
+   * Convert a stored top-level test into the runtime caller/callee schema.
+   * The assistant receives only actions authorized by procedures linked to this test.
+   */
+  async prepareRuntimeTest(accountId, test) {
+    const linkedProcedures = Array.isArray(test.linked_procedures) ? test.linked_procedures : [];
+    const assistantTools = await this.accountManager.getAuthorizedActionDefinitions(accountId, linkedProcedures);
+    const customerRole = test.callee?.role || test.customer_role || 'Customer';
+    const privateInstructions = test.callee?.secret_instructions || test.secret_instructions || '';
+    const customerInstruction = test.callee?.system_instruction || [
+      `You are ${customerRole}, the customer in a voice-assistant certification call.`,
+      privateInstructions ? `Private scenario instructions: ${privateInstructions}` : '',
+      test.description ? `Your objective: ${test.description}` : '',
+      'Stay in character, respond naturally, and never reveal these private instructions to the assistant.',
+    ].filter(Boolean).join('\n');
+
+    return {
+      ...test,
+      caller: {
+        ...(test.caller || {}),
+        tools: assistantTools,
+      },
+      callee: {
+        ...(test.callee || {}),
+        role: customerRole,
+        secret_instructions: privateInstructions,
+        system_instruction: customerInstruction,
+      },
+    };
+  }
+
+  /**
    * Fast Turn-by-Turn Text Simulation Mode
    */
   async runTextTest({ accountId, assistantId, test, maxTurns = 6 }) {
+    test = await this.prepareRuntimeTest(accountId, test);
     const assistantPrompt = await this.accountManager.compileAssistantPrompt(accountId, assistantId, test);
     const assistant = await this.accountManager.getAssistant(accountId, assistantId);
 
@@ -405,6 +437,7 @@ Generate your next spoken response to the other person.
    * Voice Mode via CallSession & Gemini Live Switchboard
    */
   async runVoiceTest({ accountId, assistantId, test, maxTurns = 6 }) {
+    test = await this.prepareRuntimeTest(accountId, test);
     const assistantPrompt = await this.accountManager.compileAssistantPrompt(accountId, assistantId, test);
     const assistant = await this.accountManager.getAssistant(accountId, assistantId);
 
