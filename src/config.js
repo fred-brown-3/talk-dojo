@@ -14,7 +14,6 @@ export const config = {
   geminiLiveModel: process.env.GEMINI_LIVE_MODEL || 'gemini-2.5-flash-native-audio-latest',
   geminiJudgeModel: process.env.GEMINI_JUDGE_MODEL || 'gemini-3.6-flash',
   rootDir,
-  scenariosDir: path.join(rootDir, 'scenarios'),
   runsDir: path.join(rootDir, 'runs'),
   publicDir: path.join(rootDir, 'public'),
   sampleRateAudioIn: 16000,   // Input to Gemini Live (16kHz PCM 16-bit mono)

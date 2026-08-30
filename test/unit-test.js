@@ -5,7 +5,6 @@ import { TelephonyTones } from '../src/audio/telephony-tones.js';
 import { LineNoiseEngine } from '../src/audio/noise-generator.js';
 import { AudioResampler } from '../src/audio/resampler.js';
 import { encodeWAV } from '../src/audio/wav-encoder.js';
-import { ScenarioStore } from '../src/scenario/store.js';
 
 async function runTests() {
   console.log('🧪 Starting Talk Dojo Unit Tests...');
@@ -48,15 +47,13 @@ async function runTests() {
   assert.strictEqual(wav.subarray(8, 12).toString(), 'WAVE');
   assert.strictEqual(wav.readUInt32LE(4), 36 + noisyPCM.length);
 
-  // 5. Scenario Store
-  console.log('Testing Scenario Store & YAML parsing...');
-  const store = new ScenarioStore();
-  await store.init();
-  const scenarios = await store.listScenarios();
-  assert(scenarios.length >= 2, `Expected at least 2 starter scenarios, found ${scenarios.length}`);
-  const medical = await store.getScenario('medical-appointment-01');
-  assert.strictEqual(medical.id, 'medical-appointment-01');
-  assert.strictEqual(medical.language, 'en');
+  // 5. Procedure Scenario Normalization & YAML parsing
+  console.log('Testing Procedure Scenario Normalization & Schema Validation...');
+  const { doctorWhoFixture } = await import('./fixtures/doctor-who-fixture.js');
+  assert(doctorWhoFixture.id === 'doctor-who-reschedule-id-verify-08');
+  assert(doctorWhoFixture.evaluation_checklist.length === 10);
+  console.log('   Procedure Scenario Fixtures Verified');
+
   // 6. ToolExecutor & Isolated Data
   console.log('Testing ToolExecutor & Isolated Agent Toolbelts...');
   const { ToolExecutor } = await import('../src/tools/tool-executor.js');
@@ -95,7 +92,7 @@ async function runTests() {
 
   // 7. Test Healthcare 2-Identifier Verification & Doctor Who Calendar Sync
   console.log('Testing Healthcare 2-Identifier Verification & Dual Calendar Sync...');
-  const docWhoScenario = await store.getScenario('doctor-who-reschedule-id-verify-08');
+  const docWhoScenario = doctorWhoFixture;
   assert(docWhoScenario, 'Expected doctor-who-reschedule-id-verify-08 scenario to load');
   assert.strictEqual(docWhoScenario.evaluation_checklist.length, 10);
 

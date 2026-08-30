@@ -363,7 +363,7 @@ Address: Headquarters & Central Dispatch, Suite 100.
           const data = yaml.parse(raw);
           data.id = data.id || path.basename(f, path.extname(f));
           data.test_scenarios = Array.isArray(data.test_scenarios) ? data.test_scenarios : [];
-          procedures.push(data);
+          procedures.push(this.normalizeProcedureScenarios(data));
         } catch (e) {}
       }
 
@@ -386,13 +386,52 @@ Address: Headquarters & Central Dispatch, Suite 100.
     }
   }
 
+  normalizeProcedureScenarios(procedure) {
+    if (!procedure) return procedure;
+    const rawList = Array.isArray(procedure.test_scenarios) ? procedure.test_scenarios : [];
+    procedure.test_scenarios = rawList.map((sc, i) => {
+      const role = sc.callee?.role || sc.customer_role || 'Customer';
+      const instructions = sc.callee?.secret_instructions || sc.secret_instructions || '';
+      const desc = sc.description || sc.test_objective || '';
+      let checklist = [];
+      if (Array.isArray(sc.evaluation_checklist) && sc.evaluation_checklist.length > 0) {
+        checklist = sc.evaluation_checklist;
+      } else if (Array.isArray(sc.checklist) && sc.checklist.length > 0) {
+        checklist = sc.checklist.map((c, ci) => ({ id: `c_${ci+1}`, goal: typeof c === 'string' ? c : (c.goal || ''), required: true }));
+      }
+      return {
+        id: sc.id || `scen-${i+1}`,
+        title: sc.title || `Test Scenario ${i+1}`,
+        description: desc,
+        test_objective: desc,
+        customer_role: role,
+        secret_instructions: instructions,
+        callee: {
+          role,
+          secret_instructions: instructions,
+        },
+        checklist: checklist.map(c => typeof c === 'string' ? c : (c.goal || '')),
+        evaluation_checklist: checklist,
+        enabled: sc.enabled !== false,
+        max_turns: sc.max_turns || 6,
+      };
+    });
+    return procedure;
+  }
+
   async getProcedure(accountId, procedureId) {
     const file = path.join(this.baseDir, accountId, 'procedures', `${procedureId}.yaml`);
-    const raw = await fs.readFile(file, 'utf8');
-    const data = yaml.parse(raw);
-    data.id = procedureId;
-    data.test_scenarios = Array.isArray(data.test_scenarios) ? data.test_scenarios : [];
-    return data;
+    try {
+      const raw = await fs.readFile(file, 'utf8');
+      const data = yaml.parse(raw);
+      data.id = procedureId;
+      return this.normalizeProcedureScenarios(data);
+    } catch (e) {
+      const all = await this.listProcedures(accountId);
+      const found = all.find(p => p.id === procedureId || p.ref_id === procedureId);
+      if (found) return this.normalizeProcedureScenarios(found);
+      throw e;
+    }
   }
 
   async saveProcedure(accountId, procedureData) {
@@ -430,9 +469,9 @@ Address: Headquarters & Central Dispatch, Suite 100.
     const data = yaml.parse(raw);
 
     await this.addToRecycleBin(accountId, {
-      type: 'procedure',
       id: procedureId,
-      name: `[${data.ref_id}] ${data.name}`,
+      type: 'procedure',
+      name: data.name || procedureId,
       originalPath: `procedures/${procedureId}.yaml`,
       data,
     });
@@ -445,18 +484,44 @@ Address: Headquarters & Central Dispatch, Suite 100.
     const procedure = await this.getProcedure(accountId, procedureId);
     if (!procedure) throw new Error(`Procedure ${procedureId} not found`);
 
+    const role = scenarioData.callee?.role || scenarioData.customer_role || 'Customer';
+    const instructions = scenarioData.callee?.secret_instructions || scenarioData.secret_instructions || '';
+    const desc = scenarioData.description || scenarioData.test_objective || '';
+
+    let checklist = [];
+    if (Array.isArray(scenarioData.evaluation_checklist) && scenarioData.evaluation_checklist.length > 0) {
+      checklist = scenarioData.evaluation_checklist;
+    } else if (Array.isArray(scenarioData.checklist) && scenarioData.checklist.length > 0) {
+      checklist = scenarioData.checklist.map((c, ci) => ({ id: `c_${ci+1}`, goal: typeof c === 'string' ? c : (c.goal || ''), required: true }));
+    }
+
     const scenarioId = scenarioData.id || this.generateGuid('scen');
     const scenario = {
       id: scenarioId,
       title: scenarioData.title || 'New Test Scenario',
-      customer_role: scenarioData.customer_role || 'Customer calling for service',
-      test_objective: scenarioData.test_objective || 'Validate procedural compliance and tool execution',
-      secret_instructions: scenarioData.secret_instructions || 'Follow the scenario guidelines.',
-      checklist: Array.isArray(scenarioData.checklist) ? scenarioData.checklist : ['Procedure executed accurately'],
-      created_at: new Date().toISOString(),
+      description: desc,
+      test_objective: desc,
+      customer_role: role,
+      secret_instructions: instructions,
+      callee: {
+        role,
+        secret_instructions: instructions,
+      },
+      checklist: checklist.map(c => typeof c === 'string' ? c : (c.goal || '')),
+      evaluation_checklist: checklist,
+      enabled: scenarioData.enabled !== false,
+      max_turns: scenarioData.max_turns || 6,
+      updated_at: new Date().toISOString(),
     };
 
-    procedure.test_scenarios.push(scenario);
+    const existingIndex = procedure.test_scenarios.findIndex(s => s.id === scenarioId);
+    if (existingIndex >= 0) {
+      procedure.test_scenarios[existingIndex] = scenario;
+    } else {
+      scenario.created_at = new Date().toISOString();
+      procedure.test_scenarios.push(scenario);
+    }
+
     await this.saveProcedure(accountId, procedure);
     return scenario;
   }

@@ -4,7 +4,6 @@ import path from 'path';
 import fs from 'fs/promises';
 import { WebSocketServer, WebSocket } from 'ws';
 import { config } from './config.js';
-import { ScenarioStore } from './scenario/store.js';
 import { CallSession } from './session/call-session.js';
 import { AccountManager } from './account/account-manager.js';
 import { MassTestGenerator } from './generators/mass-test-generator.js';
@@ -19,7 +18,6 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-const scenarioStore = new ScenarioStore();
 const accountManager = new AccountManager();
 await accountManager.init();
 let runtimeApiKey = config.geminiApiKey;
@@ -897,24 +895,13 @@ app.get('/api/runs/:id/audio', async (req, res) => {
   }
 });
 
-// List legacy starter scenarios for backwards compatibility
+// Legacy starter scenarios endpoint stub
 app.get('/api/scenarios', async (req, res) => {
-  try {
-    const list = await scenarioStore.listScenarios();
-    res.json(list);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json([]);
 });
 
 app.get('/api/scenarios/:id', async (req, res) => {
-  try {
-    const scenario = await scenarioStore.getScenario(req.params.id);
-    if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
-    res.json(scenario);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.status(404).json({ error: 'Scenario not found' });
 });
 
 // --- WebSocket Realtime Audio & Call Dispatcher ---
@@ -957,8 +944,12 @@ wss.on('connection', (ws) => {
 
       try {
         let scenario = msg.scenario;
-        if (!scenario && msg.scenarioId) {
-          scenario = await scenarioStore.getScenario(msg.scenarioId);
+        if (!scenario && msg.scenarioId && msg.accountId) {
+          const procs = await accountManager.listProcedures(msg.accountId);
+          for (const p of procs) {
+            const found = (p.test_scenarios || []).find(s => s.id === msg.scenarioId);
+            if (found) { scenario = found; break; }
+          }
         }
         if (!scenario) {
           ws.send(JSON.stringify({ type: 'error', message: 'Scenario not found' }));
@@ -983,87 +974,65 @@ wss.on('connection', (ws) => {
           broadcast({ type: 'transcript_part', ...data });
         });
 
-        // Broadcast finalized speech turns
         activeSession.on('turnComplete', (turn) => {
-          broadcast({ type: 'turn_complete', turn });
+          broadcast({ type: 'turn_complete', ...turn });
         });
 
-        // Broadcast monitor audio chunks (base64 PCM-16 24kHz)
-        activeSession.on('audioMonitor', (data) => {
-          broadcast({
-            type: 'audio_monitor',
-            speaker: data.speaker,
-            sampleRate: data.sampleRate,
-            data: data.buffer.toString('base64'),
-          });
+        activeSession.on('agentInterrupted', (data) => {
+          broadcast({ type: 'agent_interrupted', ...data });
         });
 
-        // Broadcast telephony sound cues (dial, ring, click, hangup)
-        activeSession.on('telephonyAudio', (data) => {
-          broadcast({
-            type: 'telephony_audio',
-            toneType: data.toneType,
-            sampleRate: data.sampleRate,
-            data: data.buffer.toString('base64'),
-          });
-        });
-
-        // Broadcast line static updates
-        activeSession.on('impairmentChanged', (data) => {
-          broadcast({ type: 'impairment_changed', ...data });
-        });
-
-        // Broadcast tool executions
         activeSession.on('toolExecuted', (data) => {
           broadcast({ type: 'tool_executed', ...data });
         });
 
-        // Broadcast evaluation ready
-        activeSession.on('callCompleted', (report) => {
-          broadcast({ type: 'call_completed', report });
-          activeSession = null;
+        activeSession.on('callEnded', (data) => {
+          broadcast({ type: 'call_ended', ...data });
+        });
+
+        activeSession.on('evaluationComplete', (evaluation) => {
+          broadcast({ type: 'evaluation_complete', evaluation });
         });
 
         activeSession.on('error', (err) => {
-          broadcast({ type: 'error', message: err.message || 'Call error' });
+          broadcast({ type: 'session_error', error: err.message });
         });
 
-        // Start call sequence
-        activeSession.start().catch((err) => {
-          broadcast({ type: 'error', message: err.message });
-        });
+        // Start session
+        await activeSession.start();
 
       } catch (err) {
+        console.error('Call session start error:', err);
         ws.send(JSON.stringify({ type: 'error', message: err.message }));
       }
     }
 
-    // Handle Hangup
-    else if (msg.type === 'hangup') {
+    // Handle Stop / Hangup
+    if (msg.type === 'hangup') {
       if (activeSession) {
         await activeSession.hangup();
       }
     }
 
-    // Handle Dynamic Line Static Change
-    else if (msg.type === 'set_static') {
+    // Handle Human Audio Input chunk
+    if (msg.type === 'audio_input') {
+      if (activeSession && activeSession.state === 'IN_CALL') {
+        const audioBuffer = Buffer.from(msg.data, 'base64');
+        activeSession.handleHumanAudio(audioBuffer);
+      }
+    }
+
+    // Handle Human Text Input (barge-in / speak via text)
+    if (msg.type === 'text_input') {
+      if (activeSession && activeSession.state === 'IN_CALL') {
+        activeSession.handleHumanText(msg.text);
+      }
+    }
+
+    // Handle Dynamic Impairment adjustments
+    if (msg.type === 'update_impairments') {
       if (activeSession) {
-        activeSession.setStatic(msg.staticLevel, msg.target);
-      }
-    }
-
-    // Handle Human Audio Input from Mic (PCM 16-bit 16kHz base64)
-    else if (msg.type === 'human_audio') {
-      if (activeSession && activeSession.state === 'CONNECTED' && msg.data) {
-        const pcm16k = Buffer.from(msg.data, 'base64');
-        activeSession.sendHumanAudio(pcm16k);
-      }
-    }
-
-    // Handle Human Transcript turn recorded by browser
-    else if (msg.type === 'human_transcript') {
-      if (activeSession && msg.text) {
-        activeSession.recordHumanTranscriptTurn(msg.speaker || 'caller', msg.text);
+        activeSession.updateImpairments(msg.staticLevel, msg.noiseTarget);
       }
     }
   });
@@ -1071,9 +1040,7 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {});
 });
 
-
-
-// Watch public/ directory for frontend edits and auto-refresh browser
+// Setup public file watchers
 function setupFileWatchers() {
   let publicDebounce = null;
   try {
@@ -1087,26 +1054,10 @@ function setupFileWatchers() {
   } catch (err) {
     console.warn('File watching for public/ not available:', err.message);
   }
-
-  let scenarioDebounce = null;
-  try {
-    fs.watch(config.scenariosDir, { recursive: false }, (eventType, filename) => {
-      if (filename && (filename.endsWith('.yaml') || filename.endsWith('.yml'))) {
-        if (scenarioDebounce) clearTimeout(scenarioDebounce);
-        scenarioDebounce = setTimeout(() => {
-          console.log(`📁 Scenario file updated (${filename}), notifying clients...`);
-          broadcast({ type: 'scenarios_updated', filename });
-        }, 250);
-      }
-    });
-  } catch (err) {
-    console.warn('File watching for scenarios/ not available:', err.message);
-  }
 }
 
 // Start server
 async function startServer() {
-  await scenarioStore.init();
   setupFileWatchers();
   server.listen(config.port, () => {
     console.log(`🥋 Talk Dojo listening on http://localhost:${config.port}`);

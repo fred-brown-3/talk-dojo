@@ -155,14 +155,10 @@ Testing Procedures with Tool Authorization & Scenarios (PROC-xxx)...
 
 ---
 
-## 📚 Benchmark Scenario Library
+## 📋 Integrated Test Scenarios & Certification
 
-Includes 8 benchmark telephony scenarios in `/scenarios/*.yaml`:
-1. `medical-appointment-01.yaml` — Clinic outpatient appointment confirmation and pre-procedure fasting queries.
-2. `spanish-utility-billing-02.yaml` — Bilingual high water bill inquiry with empathetic billing adjustment.
-3. `bank-fraud-check-03.yaml` — Cardholder fraud verification, card lock, and zero liability assurance.
-4. `secretary-unintended-recipient-04.yaml` — Handling calls placed to the wrong extension gracefully.
-5. `secretary-wrong-number-05.yaml` — Misdialed numbers and polite redirection.
-6. `secretary-gatekeeper-06.yaml` — Executive screening and message taking.
-7. `appointment-scheduling-toolbelts-07.yaml` — Multi-endpoint clinic scheduling with real-time tool calling.
-8. `doctor-who-reschedule-id-verify-08.yaml` — 2-factor patient identity verification and dual calendar synchronization.
+Test scenarios are integrated directly inside **Procedures** (`PROC-xxx`):
+- Each procedure authorizes and constrains tool usage while requiring at least 1 test scenario.
+- Test scenarios define the customer role, secret instructions, and evaluation criteria (e.g. 2-factor HIPAA patient identity verification, multi-endpoint scheduling, dual calendar synchronization).
+- The Certification runner automatically compiles and tests scenarios across all enabled procedures to validate that assistants adhere strictly to authorized workflows and politely decline unmapped actions.
+

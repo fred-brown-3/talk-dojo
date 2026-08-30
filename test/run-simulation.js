@@ -1,27 +1,21 @@
-import { ScenarioStore } from '../src/scenario/store.js';
+import { doctorWhoFixture } from './fixtures/doctor-who-fixture.js';
 import { CallSession } from '../src/session/call-session.js';
 import { config } from '../src/config.js';
 
-const targetScenarioId = process.argv[2] || 'secretary-unintended-recipient-04';
 const maxTurns = parseInt(process.argv.find(a => a.startsWith('--max-turns='))?.split('=')[1] || '6', 10);
 const staticLevelArg = parseFloat(process.argv.find(a => a.startsWith('--static='))?.split('=')[1] || '0.1');
 
 async function runAutonomousSimulation() {
   console.log('🥋 TALK DOJO: Autonomous End-to-End Simulation Test Harness');
   console.log(`============================================================`);
-  console.log(`- Target Scenario: ${targetScenarioId}`);
+  console.log(`- Target Scenario: ${doctorWhoFixture.title}`);
   console.log(`- Max Turns to Spar: ${maxTurns}`);
   console.log(`- Line Static Level: ${staticLevelArg}`);
   console.log(`- Live Model: ${config.geminiLiveModel}`);
   console.log(`- Judge Model: ${config.geminiJudgeModel}`);
   console.log(`============================================================\n`);
 
-  const store = new ScenarioStore();
-  const scenario = await store.getScenario(targetScenarioId);
-  if (!scenario) {
-    console.error(`❌ Scenario '${targetScenarioId}' not found.`);
-    process.exit(1);
-  }
+  const scenario = doctorWhoFixture;
 
   console.log(`📋 Loaded Scenario: "${scenario.title}"`);
   console.log(`   Caller: ${scenario.caller?.role || 'Caller'} (${scenario.caller?.voice})`);

@@ -1264,33 +1264,50 @@ class TalkDojoEnterpriseApp {
       return;
     }
 
-    this.el.procScenariosList.innerHTML = scenarios.map((sc, i) => `
-      <div class="scenario-item-card" data-idx="${i}">
+    this.el.procScenariosList.innerHTML = scenarios.map((sc, i) => {
+      const role = sc.callee?.role || sc.customer_role || 'Customer';
+      const criteriaCount = (sc.evaluation_checklist?.length) || (sc.checklist?.length) || 0;
+      return `
+      <div class="scenario-item-card" data-idx="${i}" data-proc-id="${this.activeProcedureId}">
         <div>
           <div class="text-xs font-bold">${sc.title || `Scenario #${i + 1}`}</div>
-          <div class="text-dim text-xs">${sc.callee?.role || 'Customer'} · ${sc.evaluation_checklist?.length || 0} evaluation criteria</div>
+          <div class="text-dim text-xs">${role} · ${criteriaCount} evaluation criteria</div>
         </div>
         <div class="flex-center gap-2">
-          <button class="btn-soft-xs btn-edit-scen" data-idx="${i}">Edit</button>
-          <button class="btn-icon-soft btn-del-scen" data-idx="${i}">✕</button>
+          <button type="button" class="btn-soft-xs btn-edit-scen" data-idx="${i}" data-proc-id="${this.activeProcedureId}">Edit</button>
+          <button type="button" class="btn-icon-soft btn-del-scen" data-idx="${i}" data-proc-id="${this.activeProcedureId}">✕</button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     this.el.procScenariosList.querySelectorAll('.btn-edit-scen').forEach(b => {
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const idx = parseInt(b.dataset.idx, 10);
-        this.openScenarioModalForEdit(idx);
+        const procId = b.dataset.procId || this.activeProcedureId;
+        this.openScenarioModalForEdit(idx, procId);
       });
     });
 
     this.el.procScenariosList.querySelectorAll('.btn-del-scen').forEach(b => {
-      b.addEventListener('click', async () => {
+      b.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const idx = parseInt(b.dataset.idx, 10);
-        const proc = this.procedures.find(p => p.id === this.activeProcedureId);
-        if (proc && proc.test_scenarios) {
-          proc.test_scenarios.splice(idx, 1);
-          await this.saveCurrentProcedure();
+        const procId = b.dataset.procId || this.activeProcedureId;
+        const proc = this.procedures.find(p => p.id === procId || p.ref_id === procId);
+        if (proc && proc.test_scenarios && proc.test_scenarios[idx]) {
+          const sc = proc.test_scenarios[idx];
+          if (!confirm(`Delete test scenario "${sc.title || sc.id}"?`)) return;
+          try {
+            await fetch(`/api/accounts/${this.activeAccountId}/procedures/${proc.id}/scenarios/${sc.id}`, { method: 'DELETE' });
+            await this.loadProcedures(this.activeAccountId, this.procFilter, proc.id);
+            this.showToast('Scenario deleted');
+          } catch (err) {
+            this.showToast('Delete scenario failed', 'error', err.message);
+          }
         }
       });
     });
@@ -1384,18 +1401,33 @@ class TalkDojoEnterpriseApp {
     this.adjustAllAutoGrow();
   }
 
-  openScenarioModalForEdit(index) {
-    const proc = this.procedures.find(p => p.id === this.activeProcedureId);
-    if (!proc || !proc.test_scenarios || !proc.test_scenarios[index]) return;
+  openScenarioModalForEdit(index, procId = null) {
+    const targetId = procId || this.activeProcedureId;
+    const proc = this.procedures.find(p => p.id === targetId || p.ref_id === targetId) || this.procedures[0];
+    if (!proc) {
+      console.warn('Procedure not found for scenario edit:', targetId);
+      return;
+    }
+    this.activeProcedureId = proc.id;
+    if (!proc.test_scenarios || !proc.test_scenarios[index]) {
+      console.warn('Scenario index not found:', index, proc.test_scenarios);
+      return;
+    }
     const sc = proc.test_scenarios[index];
     this.activeEditingScenarioIndex = index;
-    this.el.scenarioModalTitle.textContent = `Edit Scenario: ${sc.title}`;
+    this.el.scenarioModalTitle.textContent = `Edit Scenario: ${sc.title || `Scenario #${index + 1}`}`;
     this.el.scenModalTitle.value = sc.title || '';
-    this.el.scenModalRole.value = sc.callee?.role || 'Patient';
-    this.el.scenModalObjective.value = sc.description || '';
-    this.el.scenModalInstructions.value = sc.callee?.secret_instructions || '';
-    const goals = (sc.evaluation_checklist || []).map(g => typeof g === 'string' ? g : g.goal);
-    this.renderScenarioModalChecklist(goals);
+    this.el.scenModalRole.value = sc.callee?.role || sc.customer_role || 'Patient';
+    this.el.scenModalObjective.value = sc.description || sc.test_objective || '';
+    this.el.scenModalInstructions.value = sc.callee?.secret_instructions || sc.secret_instructions || '';
+
+    let goals = [];
+    if (Array.isArray(sc.evaluation_checklist) && sc.evaluation_checklist.length > 0) {
+      goals = sc.evaluation_checklist.map(g => typeof g === 'string' ? g : (g.goal || JSON.stringify(g)));
+    } else if (Array.isArray(sc.checklist) && sc.checklist.length > 0) {
+      goals = sc.checklist.map(g => typeof g === 'string' ? g : (g.goal || JSON.stringify(g)));
+    }
+    this.renderScenarioModalChecklist(goals.length > 0 ? goals : ['Caller verifies identity', 'Follows procedure steps']);
     this.el.btnModalDeleteScen.classList.remove('hidden');
     this.el.scenarioModal.classList.remove('hidden');
     this.adjustAllAutoGrow();
@@ -1409,8 +1441,8 @@ class TalkDojoEnterpriseApp {
     this.el.scenModalChecklist.innerHTML = goals.map((g, i) => `
       <div class="policy-item">
         <span class="policy-num">#${i + 1}</span>
-        <input type="text" value="${g.replace(/"/g, '&quot;')}" class="scen-check-input">
-        <button class="btn-icon-soft btn-del-check">✕</button>
+        <input type="text" value="${(g || '').replace(/"/g, '&quot;')}" class="scen-check-input">
+        <button type="button" class="btn-icon-soft btn-del-check">✕</button>
       </div>
     `).join('');
 
@@ -1425,7 +1457,7 @@ class TalkDojoEnterpriseApp {
     div.innerHTML = `
       <span class="policy-num">#${this.el.scenModalChecklist.children.length + 1}</span>
       <input type="text" placeholder="Evaluation criteria..." class="scen-check-input">
-      <button class="btn-icon-soft btn-del-check">✕</button>
+      <button type="button" class="btn-icon-soft btn-del-check">✕</button>
     `;
     div.querySelector('.btn-del-check').addEventListener('click', () => div.remove());
     this.el.scenModalChecklist.appendChild(div);
@@ -1440,10 +1472,22 @@ class TalkDojoEnterpriseApp {
       .filter(Boolean)
       .map((g, idx) => ({ id: `crit_${idx + 1}`, goal: g, required: true }));
 
+    const proc = this.procedures.find(p => p.id === this.activeProcedureId || p.ref_id === this.activeProcedureId) || this.procedures[0];
+    if (proc) this.activeProcedureId = proc.id;
+
+    const existingScenario = (this.activeEditingScenarioIndex >= 0 && proc && proc.test_scenarios)
+      ? proc.test_scenarios[this.activeEditingScenarioIndex]
+      : null;
+
+    const scenarioId = existingScenario ? existingScenario.id : `scen-${Date.now()}`;
+
     const scenarioObj = {
-      id: this.activeEditingScenarioIndex >= 0 ? undefined : `scen-${Date.now()}`,
+      id: scenarioId,
       title,
       description: this.el.scenModalObjective.value.trim(),
+      test_objective: this.el.scenModalObjective.value.trim(),
+      customer_role: this.el.scenModalRole.value.trim(),
+      secret_instructions: this.el.scenModalInstructions.value.trim(),
       enabled: true,
       max_turns: 6,
       callee: {
@@ -1451,6 +1495,7 @@ class TalkDojoEnterpriseApp {
         secret_instructions: this.el.scenModalInstructions.value.trim(),
       },
       evaluation_checklist: checklist,
+      checklist: checklist.map(c => c.goal),
     };
 
     if (!this.activeProcedureId) {
