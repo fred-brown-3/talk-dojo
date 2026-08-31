@@ -2,11 +2,17 @@
 
 Talk Dojo is an enterprise voice-AI testing, sparring, certification, and deployment platform for telephone assistants. Organizations define their business context, callable tools, compliance policies, approved procedures, and adversarial test scenarios, then evaluate one account-specific assistant in text or high-fidelity voice mode.
 
-**Version:** 1.0.0-beta.1
+**Version:** 1.0.0-beta.1  
+**Runtime:** Node.js 18+  
+**License:** MIT  
 
-**Runtime:** Node.js 18+
-
-**License:** MIT
+> [!NOTE]
+> **Prototype & Proof of Concept Status:**  
+> This project is an experimental prototype, rapid proof of concept, and testing ground built during an intensive 48-hour hackathon to explore real-time voice AI mechanics, acoustic latencies, dual-channel backchanneling, and legal practice workflows. It is **not a finished, production-ready product**—please don't judge too harshly if you encounter a rough edge or something isn't fully working! It is shared openly as an authentic engineering exploration.
+>
+> 📄 **Looking for the Strategic & Technical Architecture Memo?**  
+> For the complete lessons learned, architectural blueprints, product roadmap (MVP vs. Extended), and prototype screenshots, check out:  
+> 👉 **[Architecting the Legal Virtual Assistant: Strategic Lessons from a 48-Hour Voice AI Hackathon](legal-voice-ai-lessons-learned.md)**
 
 ## Current Product Model
 
