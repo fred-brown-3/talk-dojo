@@ -1002,7 +1002,8 @@ select option {
 }
 
 /* Modal and Drawer Overlay System */
-.drawer-overlay {
+.drawer-overlay,
+.modal {
   position: fixed;
   inset: 0;
   background: rgba(4, 8, 16, 0.78);
@@ -1015,7 +1016,8 @@ select option {
   padding: 20px;
   animation: modalFadeIn 0.18s ease-out;
 }
-.drawer-overlay.hidden {
+.drawer-overlay.hidden,
+.modal.hidden {
   display: none !important;
 }
 .drawer-panel {
@@ -1256,4 +1258,631 @@ select option {
   background: rgba(0, 210, 255, 0.15);
   border-color: var(--cyan);
   color: #fff;
+}
+
+/* ============================================================ */
+/* COLLAPSIBLE PERSONA REFINEMENT                               */
+/* ============================================================ */
+.collapsible-card {
+  border: 1px solid rgba(0, 210, 255, 0.2);
+  border-radius: var(--radius-md);
+  background: rgba(0, 210, 255, 0.03);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.collapsible-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.collapsible-header:hover {
+  background: rgba(0, 210, 255, 0.06);
+}
+
+.collapsible-chevron {
+  font-size: 0.9rem;
+  color: var(--accent-cyan);
+  transition: transform 0.2s ease;
+}
+
+.collapsible-chevron.open {
+  transform: rotate(180deg);
+}
+
+.collapsible-body {
+  padding: 12px 14px 14px;
+  border-top: 1px solid rgba(0, 210, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================================ */
+/* DIRECTION TOGGLE BUTTONS (INBOUND VS OUTBOUND)               */
+/* ============================================================ */
+.direction-toggle-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.direction-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-muted);
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.direction-btn:hover {
+  background: var(--bg-input-focus);
+  border-color: rgba(0, 210, 255, 0.4);
+  color: var(--text-main);
+}
+
+.direction-btn.active {
+  background: rgba(0, 210, 255, 0.08);
+  border-color: var(--accent-cyan);
+  color: var(--text-main);
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.15);
+}
+
+.direction-btn .dir-icon {
+  font-size: 1.1rem;
+  margin-top: 2px;
+}
+
+.direction-btn .dir-text-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.direction-btn .dir-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.direction-btn .dir-hint {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  line-height: 1.3;
+}
+
+.direction-btn.active .dir-hint {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ============================================================ */
+/* TEST CHAT DEDICATED PAGE (SIDE-BY-SIDE GRID)                */
+/* ============================================================ */
+.test-chat-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 16px;
+  height: calc(100vh - 160px);
+  min-height: 520px;
+}
+
+@media (max-width: 1024px) {
+  .test-chat-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}
+
+.scenario-setup-panel {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.live-call-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  height: 100%;
+}
+
+.live-call-panel .chat-sparring-feed {
+  flex: 1;
+  min-height: 240px;
+  max-height: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* Call Timer */
+.call-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.5px;
+}
+
+.call-timer::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: #ef4444;
+  border-radius: 50%;
+  animation: pulse-dot 1.2s infinite;
+}
+
+@keyframes pulse-dot {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.7); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Audio Visualizer Waves */
+.audio-visualizer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 210, 255, 0.03);
+  border: 1px dashed rgba(0, 210, 255, 0.2);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.audio-visualizer-container.in-call {
+  background: rgba(0, 210, 255, 0.08);
+  border-style: solid;
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 14px rgba(0, 210, 255, 0.12);
+}
+
+.audio-wave-bars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+}
+
+.wave-bar {
+  width: 4px;
+  height: 6px;
+  background: var(--text-dim);
+  border-radius: 2px;
+  transition: height 0.15s ease, background 0.15s ease;
+}
+
+.audio-visualizer-container.in-call .wave-bar {
+  background: var(--accent-cyan);
+  animation: wave-bounce 1s infinite ease-in-out;
+}
+
+.audio-visualizer-container.in-call .wave-bar:nth-child(1) { animation-delay: 0.0s; }
+.audio-visualizer-container.in-call .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.audio-visualizer-container.in-call .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.audio-visualizer-container.in-call .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+.audio-visualizer-container.in-call .wave-bar:nth-child(5) { animation-delay: 0.2s; }
+.audio-visualizer-container.in-call .wave-bar:nth-child(6) { animation-delay: 0.1s; }
+.audio-visualizer-container.in-call .wave-bar:nth-child(7) { animation-delay: 0.3s; }
+.audio-visualizer-container.in-call .wave-bar:nth-child(8) { animation-delay: 0.0s; }
+
+@keyframes wave-bounce {
+  0%, 100% { height: 6px; }
+  50% { height: 22px; }
+}
+
+.btn-outline-cyan {
+  background: transparent;
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-outline-cyan:hover {
+  background: rgba(0, 210, 255, 0.12);
+  color: #fff;
+}
+
+/* ============================================================ */
+/* SMARTPHONE GLASS SCREEN CHASSIS                              */
+/* ============================================================ */
+.phone-chassis {
+  border: 1px solid rgba(0, 210, 255, 0.25);
+  background: linear-gradient(180deg, rgba(16, 24, 38, 0.96) 0%, rgba(9, 14, 22, 0.98) 100%);
+  border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.phone-screen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 12px;
+}
+
+.phone-avatar-col {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.phone-avatar-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 210, 255, 0.1);
+  border: 1.5px solid var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+}
+
+.phone-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #fff;
+  display: block;
+}
+
+.phone-status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.phone-status-text {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.phone-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-icon-phone {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+}
+
+.btn-icon-phone:hover {
+  background: rgba(0, 210, 255, 0.15);
+  border-color: var(--accent-cyan);
+  color: #fff;
+  transform: rotate(45deg);
+}
+
+/* ============================================================ */
+/* ROUND TACTILE PHONE KEYPAD BUTTONS                           */
+/* ============================================================ */
+.phone-keypad-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.phone-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.phone-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+}
+
+.phone-btn:active {
+  transform: translateY(1px);
+}
+
+.phone-btn-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.phone-btn-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 3px;
+}
+
+/* Call Button (Green Glow) */
+.phone-btn-call {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #34d399;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.25);
+}
+
+.phone-btn-call:hover {
+  background: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 22px rgba(16, 185, 129, 0.45);
+}
+
+/* Mute Button */
+.phone-btn-mute {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+}
+
+.phone-btn-mute:hover {
+  border-color: var(--accent-cyan);
+  color: #fff;
+}
+
+.phone-btn-mute.active-muted {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #f87171;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.3);
+}
+
+/* Hold / Pause Button (Amber Glow) */
+.phone-btn-hold {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+
+.phone-btn-hold:hover {
+  background: rgba(245, 158, 11, 0.28);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+}
+
+.phone-btn-hold.active-hold {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: #fbbf24;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+  animation: pulse-hold 1.4s infinite;
+}
+
+@keyframes pulse-hold {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* End Call Button (Red Glow) */
+.phone-btn-end {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: #ef4444;
+  color: #f87171;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);
+}
+
+.phone-btn-end:hover {
+  background: rgba(239, 68, 68, 0.38);
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.5);
+}
+
+/* Reset / Clear Button */
+.phone-btn-reset {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text-dim);
+}
+
+.phone-btn-reset:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+/* ============================================================ */
+/* DARK NEON SEND BUTTON (NO HARSH WHITE)                       */
+/* ============================================================ */
+.btn-send-cyan {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 210, 255, 0.12);
+  border: 1px solid var(--accent-cyan);
+  color: #00e5ff;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-send-cyan:hover {
+  background: rgba(0, 210, 255, 0.25);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(0, 210, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-send-cyan .send-arrow {
+  font-size: 0.85rem;
+  transition: transform 0.15s ease;
+}
+
+.btn-send-cyan:hover .send-arrow {
+  transform: translateX(2px);
+}
+
+/* ============================================================ */
+/* CALL REVIEW & AUDIO RECORDING MODAL                          */
+/* ============================================================ */
+.modal {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(4, 8, 16, 0.85) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 99999 !important;
+  padding: 20px !important;
+}
+
+.modal.hidden {
+  display: none !important;
+}
+
+.modal-call-review-content {
+  max-width: 780px;
+  width: 92%;
+  max-height: 88vh;
+  overflow-y: auto;
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  background: linear-gradient(180deg, rgba(16, 24, 38, 0.98) 0%, rgba(9, 14, 22, 0.99) 100%);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 210, 255, 0.15);
+  border-radius: 18px;
+}
+
+.call-recording-player-card {
+  background: rgba(0, 210, 255, 0.04);
+  border: 1px solid rgba(0, 210, 255, 0.2);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.custom-audio-player {
+  filter: invert(0.88) hue-rotate(170deg) contrast(1.1);
+  border-radius: 8px;
+  outline: none;
+}
+
+.review-referee-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.badge-score-pill {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid #10b981;
+  color: #34d399;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.review-coaching-box {
+  background: rgba(245, 158, 11, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.review-coaching-list {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.6;
+}
+
+.review-transcript-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.review-transcript-container {
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.review-turn-bubble {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.review-turn-caller {
+  background: rgba(0, 210, 255, 0.08);
+  border-left: 3px solid var(--accent-cyan);
+  align-self: flex-start;
+  max-width: 90%;
+}
+
+.review-turn-assistant {
+  background: rgba(16, 185, 129, 0.08);
+  border-left: 3px solid #10b981;
+  align-self: flex-start;
+  max-width: 90%;
+}
+
+.review-turn-role {
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 2px;
 }

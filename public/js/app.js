@@ -1,3 +1,5 @@
+import { AudioManager } from './audio-manager.js';
+
 /**
  * Talk Dojo 🥋 — Enterprise Voice AI Platform
  * Controller with URL GUID-based Deep Linking (/#/account/:accountId/...),
@@ -6,6 +8,7 @@
  * Procedures with Tool Constraints & Integrated Scenarios (PROC-xxx),
  * Animated Status Circle & Timer for AI Tool Generation,
  * Native Gemini Live Audio Voice Previews,
+ * Dedicated Test Chat & Duplex Voice Sparring,
  * and In-Progress Live Certification Runner.
  */
 
@@ -37,8 +40,18 @@ class TalkDojoEnterpriseApp {
     this.companySections = [];
     this.rawMarkdownMode = false;
 
+    this.audioManager = new AudioManager();
+    this.testChatDirection = 'inbound';
+    this.scenarioEditorDirection = 'inbound';
+    this.isCallActive = false;
+    this.isCallOnHold = false;
+    this.callTimerInterval = null;
+    this.callSeconds = 0;
+    this.isMicMuted = false;
+    this.selectedTestChatScenarioId = 'custom';
+
     this.certMode = 'text'; // 'text' | 'voice'
-    this.chatModality = 'text'; // 'text' | 'voice' | 'hybrid'
+    this.chatModality = 'voice'; // 'voice' by default for duplex browser audio
     this.chatSparringHistory = [];
     this.chatSessionActive = false;
 
@@ -200,6 +213,8 @@ class TalkDojoEnterpriseApp {
       testActiveLinksList: document.getElementById('test-active-links-list'),
       testSuggestedLinksBox: document.getElementById('test-suggested-links-box'),
       testSuggestedLinksList: document.getElementById('test-suggested-links-list'),
+      scenarioDirInbound: document.getElementById('scenario-dir-inbound'),
+      scenarioDirOutbound: document.getElementById('scenario-dir-outbound'),
       testRoleInput: document.getElementById('test-role-input'),
       testMaxTurnsInput: document.getElementById('test-max-turns-input'),
       testObjectiveInput: document.getElementById('test-objective-input'),
@@ -207,42 +222,67 @@ class TalkDojoEnterpriseApp {
       btnTestAddCriteria: document.getElementById('btn-test-add-criteria'),
       testCriteriaList: document.getElementById('test-criteria-list'),
 
-      // Tab 6: Single Assistant + Embedded Chat
+      // Tab 6: Assistant Persona
+      asstSubviewPersona: document.getElementById('asst-subview-persona'),
+      asstSubviewChat: document.getElementById('asst-subview-chat'),
       assistantEditorCard: document.getElementById('assistant-editor-card'),
       editorHeading: document.getElementById('editor-heading'),
       editorSubheading: document.getElementById('editor-subheading'),
       btnEditorSaveAsst: document.getElementById('btn-editor-save-asst'),
+      btnToggleAiRefine: document.getElementById('btn-toggle-ai-refine'),
+      aiRefineChevron: document.getElementById('ai-refine-chevron'),
       editorAiCreatorBox: document.getElementById('editor-ai-creator-box'),
       editorDescribeAsstInput: document.getElementById('editor-describe-asst-input'),
       btnAiGenerateAsst: document.getElementById('btn-ai-generate-asst'),
       asstNameInput: document.getElementById('asst-name-input'),
       asstVoiceSelect: document.getElementById('asst-voice-select'),
       btnPreviewVoice: document.getElementById('btn-preview-voice'),
-      voicePreviewAudio: document.getElementById('voice-preview-audio'),
-      asstPersonalityInput: document.getElementById('asst-personality-input'),
+      asstSpeakingStyleInput: document.getElementById('asst-speaking-style-input'),
+      asstListeningStyleInput: document.getElementById('asst-listening-style-input'),
       asstBackstoryInput: document.getElementById('asst-backstory-input'),
-      asstToolsCheckboxes: document.getElementById('asst-tools-checkboxes'),
-      asstRulesList: document.getElementById('asst-rules-list'),
-      btnAsstAddRule: document.getElementById('btn-asst-add-rule'),
 
-      // Embedded Chat inside Assistant Edit View
-      btnReviewChatInteraction: document.getElementById('btn-review-chat-interaction'),
-      chatTargetMode: document.getElementById('chat-target-mode'),
-      chatScenarioSelectBox: document.getElementById('chat-scenario-select-box'),
-      chatScenarioSelect: document.getElementById('chat-scenario-select'),
-      chatPastedScenarioBox: document.getElementById('chat-pasted-scenario-box'),
-      chatPastedInput: document.getElementById('chat-pasted-input'),
-      chatModalityText: document.getElementById('chat-modality-text'),
-      chatModalityVoice: document.getElementById('chat-modality-voice'),
-      chatModalityHybrid: document.getElementById('chat-modality-hybrid'),
-      btnBeginChat: document.getElementById('btn-begin-chat'),
-      btnResetChat: document.getElementById('btn-reset-chat'),
-      chatPreCallBanner: document.getElementById('chat-pre-call-banner'),
-      chatSparringFeed: document.getElementById('chat-sparring-feed'),
-      chatInputRowBox: document.getElementById('chat-input-row-box'),
-      chatUserInput: document.getElementById('chat-user-input'),
-      btnSendChat: document.getElementById('btn-send-chat'),
-      chatAudioPlayer: document.getElementById('chat-audio-player'),
+      // Call Review Modal Elements
+      modalCallReview: document.getElementById('modal-call-review'),
+      btnCloseCallReview: document.getElementById('btn-close-call-review'),
+      btnReviewCloseFooter: document.getElementById('btn-review-close-footer'),
+      reviewCallScenarioTitle: document.getElementById('review-call-scenario-title'),
+      reviewCallDuration: document.getElementById('review-call-duration'),
+      reviewCallDate: document.getElementById('review-call-date'),
+      reviewRecordingFilename: document.getElementById('review-recording-filename'),
+      reviewAudioPlayer: document.getElementById('review-audio-player'),
+      reviewScorePill: document.getElementById('review-score-pill'),
+      reviewEvalSummary: document.getElementById('review-eval-summary'),
+      reviewCoachingList: document.getElementById('review-coaching-list'),
+      reviewTranscriptTurns: document.getElementById('review-transcript-turns'),
+      btnReviewExportReport: document.getElementById('btn-review-export-report'),
+
+      // Tab 6: Dedicated Test Chat (Live Voice & Duplex Sparring)
+      chatScenarioPicker: document.getElementById('chat-scenario-picker'),
+      chatScenarioBadge: document.getElementById('chat-scenario-badge'),
+      chatDirInbound: document.getElementById('chat-dir-inbound'),
+      chatDirOutbound: document.getElementById('chat-dir-outbound'),
+      chatScenarioTitle: document.getElementById('chat-scenario-title'),
+      chatCustomerRole: document.getElementById('chat-customer-role'),
+      chatInstructions: document.getElementById('chat-instructions'),
+      btnChatUpdateScenario: document.getElementById('btn-chat-update-scenario'),
+      chatUpdateScenarioId: document.getElementById('chat-update-scenario-id'),
+      btnChatSaveNewScenario: document.getElementById('btn-chat-save-new-scenario'),
+      callStatusIndicator: document.getElementById('call-status-indicator'),
+      callStatusLabel: document.getElementById('call-status-label'),
+      callAssistantLabel: document.getElementById('call-assistant-label'),
+      callTimerBox: document.getElementById('call-timer-box'),
+      btnReviewInteraction: document.getElementById('btn-review-interaction'),
+      callAudioVisualizerBox: document.getElementById('call-audio-visualizer-box'),
+      callActivityText: document.getElementById('call-activity-text'),
+      btnStartCall: document.getElementById('btn-start-call'),
+      btnMuteMic: document.getElementById('btn-mute-mic'),
+      btnHoldCall: document.getElementById('btn-hold-call'),
+      btnEndCall: document.getElementById('btn-end-call'),
+      btnResetCall: document.getElementById('btn-reset-call'),
+      btnClearChatHistory: document.getElementById('btn-clear-chat-history'),
+      chatLiveTranscript: document.getElementById('chat-live-transcript'),
+      chatTextFallbackInput: document.getElementById('chat-text-fallback-input'),
+      btnSendTextFallback: document.getElementById('btn-send-text-fallback'),
 
       // Tab 6: Certification
       certSubviewHistory: document.getElementById('cert-subview-history'),
@@ -366,7 +406,11 @@ class TalkDojoEnterpriseApp {
         sub = 'info';
       } else {
         tab = this.normalizeTabId(parts[2]);
-        sub = parts[3] || (parts[2] === 'policies' ? 'all_enabled' : 'all');
+        let rawSub = parts[3] || (parts[2] === 'policies' ? 'all_enabled' : (tab === 'assistant' ? 'persona' : 'all'));
+        if (tab === 'assistant') {
+          if (rawSub === 'edit' || rawSub === 'settings') rawSub = 'persona';
+        }
+        sub = rawSub;
       }
     } else {
       tab = this.normalizeTabId(parts[0] || 'account');
@@ -523,24 +567,38 @@ class TalkDojoEnterpriseApp {
     if (this.el.btnTestAddLinkPicker) this.el.btnTestAddLinkPicker.addEventListener('click', () => this.openAddLinkPickerModal());
     if (this.el.btnTestAddCriteria) this.el.btnTestAddCriteria.addEventListener('click', () => this.addTestCriteriaRow());
 
-    // Tab 6: Assistant
-    this.el.btnAiGenerateAsst.addEventListener('click', () => this.runAiDescribeAssistant());
-    this.el.btnEditorSaveAsst.addEventListener('click', () => this.saveCurrentAssistant());
-    this.el.btnAsstAddRule.addEventListener('click', () => this.addAssistantRuleRow());
-    this.el.btnPreviewVoice.addEventListener('click', () => this.playVoicePreview());
+    // Scenario Editor Direction toggle
+    if (this.el.scenarioDirInbound) this.el.scenarioDirInbound.addEventListener('click', () => this.setScenarioEditorDirection('inbound'));
+    if (this.el.scenarioDirOutbound) this.el.scenarioDirOutbound.addEventListener('click', () => this.setScenarioEditorDirection('outbound'));
 
-    // Embedded Chat in Assistant Edit Pane
-    this.el.chatTargetMode.addEventListener('change', () => this.updateChatTargetMode());
-    [this.el.chatModalityText, this.el.chatModalityVoice, this.el.chatModalityHybrid].forEach(b => {
-      b.addEventListener('click', () => this.setChatModality(b.dataset.mod));
-    });
-    this.el.btnBeginChat.addEventListener('click', () => this.beginChatSession());
-    this.el.btnResetChat.addEventListener('click', () => this.resetChatSession());
-    this.el.btnSendChat.addEventListener('click', () => this.sendChatTurn());
-    this.el.chatUserInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.sendChatTurn();
-    });
-    this.el.btnReviewChatInteraction.addEventListener('click', () => this.reviewChatInteraction());
+    // Tab 6: Assistant Persona
+    if (this.el.btnToggleAiRefine) this.el.btnToggleAiRefine.addEventListener('click', () => this.toggleAiRefineBox());
+    if (this.el.btnAiGenerateAsst) this.el.btnAiGenerateAsst.addEventListener('click', () => this.runAiDescribeAssistant());
+    if (this.el.btnEditorSaveAsst) this.el.btnEditorSaveAsst.addEventListener('click', () => this.saveCurrentAssistant());
+    if (this.el.btnPreviewVoice) this.el.btnPreviewVoice.addEventListener('click', () => this.playVoicePreview());
+
+    // Tab 6: Dedicated Test Chat (Live Voice & Duplex Sparring)
+    if (this.el.chatScenarioPicker) this.el.chatScenarioPicker.addEventListener('change', () => this.onTestChatScenarioSelected(this.el.chatScenarioPicker.value));
+    if (this.el.chatDirInbound) this.el.chatDirInbound.addEventListener('click', () => this.setTestChatDirection('inbound'));
+    if (this.el.chatDirOutbound) this.el.chatDirOutbound.addEventListener('click', () => this.setTestChatDirection('outbound'));
+    if (this.el.btnChatUpdateScenario) this.el.btnChatUpdateScenario.addEventListener('click', () => this.updateScenarioFromChat());
+    if (this.el.btnChatSaveNewScenario) this.el.btnChatSaveNewScenario.addEventListener('click', () => this.saveNewScenarioFromChat());
+    if (this.el.btnStartCall) this.el.btnStartCall.addEventListener('click', () => this.startLiveCall());
+    if (this.el.btnMuteMic) this.el.btnMuteMic.addEventListener('click', () => this.toggleMicMute());
+    if (this.el.btnHoldCall) this.el.btnHoldCall.addEventListener('click', () => this.toggleCallHold());
+    if (this.el.btnEndCall) this.el.btnEndCall.addEventListener('click', () => this.endLiveCall());
+    if (this.el.btnResetCall) this.el.btnResetCall.addEventListener('click', () => this.resetCallState());
+    if (this.el.btnClearChatHistory) this.el.btnClearChatHistory.addEventListener('click', () => this.clearChatHistory());
+    if (this.el.btnSendTextFallback) this.el.btnSendTextFallback.addEventListener('click', () => this.sendTextFallbackTurn());
+    if (this.el.chatTextFallbackInput) {
+      this.el.chatTextFallbackInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') this.sendTextFallbackTurn();
+      });
+    }
+    if (this.el.btnReviewInteraction) this.el.btnReviewInteraction.addEventListener('click', () => this.reviewChatInteraction());
+    if (this.el.btnCloseCallReview) this.el.btnCloseCallReview.addEventListener('click', () => this.closeCallReviewModal());
+    if (this.el.btnReviewCloseFooter) this.el.btnReviewCloseFooter.addEventListener('click', () => this.closeCallReviewModal());
+    if (this.el.btnReviewExportReport) this.el.btnReviewExportReport.addEventListener('click', () => this.exportCurrentRunReport());
 
     // Tab 6: Certification
     this.el.btnCertNavNew.addEventListener('click', () => this.navigate('certification', 'new'));
@@ -640,7 +698,14 @@ class TalkDojoEnterpriseApp {
       }
     }
     if (tabId === 'assistant') {
-      this.loadAssistant(this.activeAccountId);
+      const isChat = sub === 'chat';
+      if (this.el.asstSubviewPersona) this.el.asstSubviewPersona.classList.toggle('hidden', isChat);
+      if (this.el.asstSubviewChat) this.el.asstSubviewChat.classList.toggle('hidden', !isChat);
+      this.loadAssistant(this.activeAccountId).then(() => {
+        if (isChat) {
+          this.setupTestChat();
+        }
+      });
     }
     if (tabId === 'certification') {
       const isNew = sub === 'new';
@@ -1644,6 +1709,7 @@ class TalkDojoEnterpriseApp {
     if (this.el.testEditorTitle) this.el.testEditorTitle.textContent = test.title || 'Edit Test Scenario';
     if (this.el.testTitleInput) this.el.testTitleInput.value = test.title || '';
     if (this.el.testStatusSelect) this.el.testStatusSelect.value = test.status || 'enabled';
+    this.setScenarioEditorDirection(test.direction || 'inbound');
     if (this.el.testRoleInput) this.el.testRoleInput.value = test.callee?.role || test.customer_role || '';
     if (this.el.testMaxTurnsInput) this.el.testMaxTurnsInput.value = test.max_turns || 6;
     if (this.el.testObjectiveInput) this.el.testObjectiveInput.value = test.description || test.test_objective || '';
@@ -1661,6 +1727,12 @@ class TalkDojoEnterpriseApp {
     this.renderTestCriteriaList(checklist);
 
     this.adjustAllAutoGrow();
+  }
+
+  setScenarioEditorDirection(dir = 'inbound') {
+    this.scenarioEditorDirection = dir === 'outbound' ? 'outbound' : 'inbound';
+    if (this.el.scenarioDirInbound) this.el.scenarioDirInbound.classList.toggle('active', this.scenarioEditorDirection === 'inbound');
+    if (this.el.scenarioDirOutbound) this.el.scenarioDirOutbound.classList.toggle('active', this.scenarioEditorDirection === 'outbound');
   }
 
   renderActiveTestLinks() {
@@ -1759,6 +1831,7 @@ class TalkDojoEnterpriseApp {
     if (this.el.testEditorTitle) this.el.testEditorTitle.textContent = 'Create New Test Scenario';
     if (this.el.testTitleInput) this.el.testTitleInput.value = defaults.title || '';
     if (this.el.testStatusSelect) this.el.testStatusSelect.value = defaults.status || 'enabled';
+    this.setScenarioEditorDirection(defaults.direction || 'inbound');
     if (this.el.testRoleInput) this.el.testRoleInput.value = defaults.role || 'Caller inquiring regarding services';
     if (this.el.testMaxTurnsInput) this.el.testMaxTurnsInput.value = 6;
     if (this.el.testObjectiveInput) this.el.testObjectiveInput.value = defaults.objective || '';
@@ -1793,6 +1866,7 @@ class TalkDojoEnterpriseApp {
       id: this.activeTestId,
       title,
       status: this.el.testStatusSelect.value,
+      direction: this.scenarioEditorDirection || 'inbound',
       max_turns: parseInt(this.el.testMaxTurnsInput.value, 10) || 6,
       customer_role: this.el.testRoleInput.value.trim(),
       test_objective: this.el.testObjectiveInput.value.trim(),
@@ -2118,7 +2192,7 @@ class TalkDojoEnterpriseApp {
     }
   }
 
-  // --- TAB 6: SINGLE ASSISTANT + EMBEDDED CHAT ---
+  // --- TAB 6: SINGLE ASSISTANT PERSONA + DEDICATED TEST CHAT ---
 
   async loadAssistant(accountId) {
     if (!accountId) return;
@@ -2127,68 +2201,56 @@ class TalkDojoEnterpriseApp {
       if (!res.ok) throw new Error('Assistant not found');
       this.assistant = await res.json();
       this.activeAssistantId = this.assistant.id;
-      this.el.certAssistantSummary.textContent = `${this.assistant.name} · ${this.assistant.voice || 'Aoede'}`;
-      this.el.btnSnapshotCertify.disabled = false;
-      this.el.editorHeading.textContent = `Edit Assistant: ${this.assistant.name}`;
-      this.el.editorSubheading.textContent = 'Update the account assistant persona, guidelines, or voice timbre.';
-      this.el.editorAiCreatorBox.classList.remove('hidden');
+      if (this.el.certAssistantSummary) {
+        this.el.certAssistantSummary.textContent = `${this.assistant.name} · ${this.assistant.voice || 'Aoede'}`;
+      }
+      if (this.el.btnSnapshotCertify) this.el.btnSnapshotCertify.disabled = false;
+      if (this.el.editorHeading) this.el.editorHeading.textContent = `Assistant Persona: ${this.assistant.name}`;
+      if (this.el.editorSubheading) this.el.editorSubheading.textContent = 'Configure name, voice timbre, personality style, and backstory.';
+      if (this.el.callAssistantLabel) this.el.callAssistantLabel.textContent = this.assistant.name || 'Assistant';
       this.populateAssistantForm(this.assistant);
     } catch (e) {
       this.assistant = null;
       this.activeAssistantId = null;
-      this.el.certAssistantSummary.textContent = 'Assistant configuration unavailable';
-      this.el.btnSnapshotCertify.disabled = true;
+      if (this.el.certAssistantSummary) this.el.certAssistantSummary.textContent = 'Assistant configuration unavailable';
+      if (this.el.btnSnapshotCertify) this.el.btnSnapshotCertify.disabled = true;
       console.error('Error loading assistant:', e);
     }
   }
 
   populateAssistantForm(asst) {
-    this.el.asstNameInput.value = asst.name || '';
-    this.el.asstVoiceSelect.value = asst.voice || 'Aoede';
-    this.el.asstPersonalityInput.value = asst.personality_style || '';
-    this.el.asstBackstoryInput.value = asst.backstory || '';
+    if (this.el.asstNameInput) this.el.asstNameInput.value = asst.name || '';
+    if (this.el.asstVoiceSelect) this.el.asstVoiceSelect.value = asst.voice || 'Aoede';
+    if (this.el.asstSpeakingStyleInput) this.el.asstSpeakingStyleInput.value = asst.speaking_style || asst.personality_style || '';
+    if (this.el.asstListeningStyleInput) this.el.asstListeningStyleInput.value = asst.listening_style || 'dynamic - occasional verbal confirmation that the agent is listening while the user continues to speak - hmmm, ok, I see.';
+    if (this.el.asstBackstoryInput) this.el.asstBackstoryInput.value = asst.backstory || '';
 
-    this.renderAssistantRulesList(asst.conversational_rules || [
-      'Speak with gentle warmth and polite courtesy.',
-      'Remain calm and attentive when callers are stressed.',
-    ]);
-
-    // Populate scenario selector for embedded chat
-    const allScens = this.testScenarios || [];
-    this.el.chatScenarioSelect.innerHTML = allScens.map(s => `<option value="${s.id}">${s.title}</option>`).join('');
+    // Collapsible Refine: collapsed by default if data exists, auto-expanded if empty on first setup
+    const hasData = Boolean(asst.name || asst.personality_style);
+    if (this.el.editorAiCreatorBox) {
+      this.el.editorAiCreatorBox.classList.toggle('hidden', hasData);
+    }
+    if (this.el.aiRefineChevron) {
+      this.el.aiRefineChevron.classList.toggle('open', !hasData);
+    }
 
     this.adjustAllAutoGrow();
   }
 
-  renderAssistantRulesList(rules) {
-    this.el.asstRulesList.innerHTML = rules.map((r, i) => `
-      <div class="policy-item">
-        <span class="policy-num">#${i + 1}</span>
-        <input type="text" value="${r.replace(/"/g, '&quot;')}" class="asst-rule-input">
-        <button class="btn-icon-soft btn-del-asst-rule">✕</button>
-      </div>
-    `).join('');
-    this.el.asstRulesList.querySelectorAll('.btn-del-asst-rule').forEach(b => {
-      b.addEventListener('click', (e) => e.target.closest('.policy-item').remove());
-    });
-  }
-
-  addAssistantRuleRow() {
-    const div = document.createElement('div');
-    div.className = 'policy-item';
-    const count = this.el.asstRulesList.children.length + 1;
-    div.innerHTML = `
-      <span class="policy-num">#${count}</span>
-      <input type="text" placeholder="Guideline rule..." class="asst-rule-input">
-      <button class="btn-icon-soft btn-del-asst-rule">✕</button>
-    `;
-    div.querySelector('.btn-del-asst-rule').addEventListener('click', () => div.remove());
-    this.el.asstRulesList.appendChild(div);
-    div.querySelector('.asst-rule-input').focus();
+  toggleAiRefineBox() {
+    if (!this.el.editorAiCreatorBox) return;
+    const isCurrentlyHidden = this.el.editorAiCreatorBox.classList.contains('hidden');
+    this.el.editorAiCreatorBox.classList.toggle('hidden', !isCurrentlyHidden);
+    if (this.el.aiRefineChevron) {
+      this.el.aiRefineChevron.classList.toggle('open', isCurrentlyHidden);
+    }
+    if (isCurrentlyHidden && this.el.editorDescribeAsstInput) {
+      this.el.editorDescribeAsstInput.focus();
+    }
   }
 
   async runAiDescribeAssistant() {
-    const prompt = this.el.editorDescribeAsstInput.value.trim();
+    const prompt = this.el.editorDescribeAsstInput?.value.trim();
     if (!prompt) return this.showToast('Please describe your desired assistant.', 'error');
 
     try {
@@ -2198,12 +2260,11 @@ class TalkDojoEnterpriseApp {
         body: JSON.stringify({ prompt }),
       });
       const data = await res.json();
-      if (data.name) this.el.asstNameInput.value = data.name;
-      if (data.voice) this.el.asstVoiceSelect.value = data.voice;
-      if (data.personality_style) this.el.asstPersonalityInput.value = data.personality_style;
-      if (data.backstory) this.el.asstBackstoryInput.value = data.backstory;
-      if (Array.isArray(data.conversational_rules)) this.renderAssistantRulesList(data.conversational_rules);
-      this.el.editorDescribeAsstInput.value = '';
+      if (data.name && this.el.asstNameInput) this.el.asstNameInput.value = data.name;
+      if (data.voice && this.el.asstVoiceSelect) this.el.asstVoiceSelect.value = data.voice;
+      if (data.personality_style && this.el.asstPersonalityInput) this.el.asstPersonalityInput.value = data.personality_style;
+      if (data.backstory && this.el.asstBackstoryInput) this.el.asstBackstoryInput.value = data.backstory;
+      if (this.el.editorDescribeAsstInput) this.el.editorDescribeAsstInput.value = '';
       this.adjustAllAutoGrow();
       this.showToast(`AI generated: ${data.name}!`);
     } catch (e) {
@@ -2212,7 +2273,9 @@ class TalkDojoEnterpriseApp {
   }
 
   async playVoicePreview() {
-    const voice = this.el.asstVoiceSelect.value || 'Aoede';
+    const voice = this.el.asstVoiceSelect?.value || 'Aoede';
+    if (!this.el.btnPreviewVoice || !this.el.voicePreviewAudio) return;
+
     this.el.btnPreviewVoice.disabled = true;
     this.el.btnPreviewVoice.textContent = '🔊 Playing (10s)...';
 
@@ -2236,18 +2299,17 @@ class TalkDojoEnterpriseApp {
   }
 
   async saveCurrentAssistant() {
-    const name = this.el.asstNameInput.value.trim();
+    const name = this.el.asstNameInput?.value.trim();
     if (!name) return this.showToast('Assistant name is required', 'error');
-
-    const rules = Array.from(this.el.asstRulesList.querySelectorAll('.asst-rule-input')).map(i => i.value.trim()).filter(Boolean);
 
     const payload = {
       id: this.activeAssistantId || 'assistant',
       name,
-      voice: this.el.asstVoiceSelect.value,
-      personality_style: this.el.asstPersonalityInput.value.trim(),
-      backstory: this.el.asstBackstoryInput.value.trim(),
-      conversational_rules: rules,
+      voice: this.el.asstVoiceSelect?.value || 'Aoede',
+      speaking_style: this.el.asstSpeakingStyleInput?.value.trim() || '',
+      personality_style: this.el.asstSpeakingStyleInput?.value.trim() || '',
+      listening_style: this.el.asstListeningStyleInput?.value.trim() || 'dynamic - occasional verbal confirmation that the agent is listening while the user continues to speak - hmmm, ok, I see.',
+      backstory: this.el.asstBackstoryInput?.value.trim() || '',
     };
 
     try {
@@ -2258,74 +2320,395 @@ class TalkDojoEnterpriseApp {
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
       await this.loadAssistant(this.activeAccountId);
-      this.navigate('assistant', 'edit');
-      this.showToast(`Assistant "${name}" saved!`);
+      this.showToast(`Assistant "${name}" persona saved!`);
     } catch (e) {
       this.showToast('Save assistant failed', 'error', e.message);
     }
   }
 
-  // --- EMBEDDED CHAT CONTROLLER ---
+  // --- DEDICATED TEST CHAT CONTROLLER (BROWSER MIC & DUPLEX SPARRING) ---
 
-  updateChatTargetMode() {
-    const mode = this.el.chatTargetMode.value;
-    this.el.chatScenarioSelectBox.classList.toggle('hidden', mode !== 'scenario');
-    this.el.chatPastedScenarioBox.classList.toggle('hidden', mode !== 'pasted');
-    this.resetChatSession();
+  setupTestChat() {
+    this.renderTestChatScenarioPicker();
+    this.setTestChatDirection(this.testChatDirection || 'inbound');
+    if (this.selectedTestChatScenarioId && this.selectedTestChatScenarioId !== 'custom') {
+      this.onTestChatScenarioSelected(this.selectedTestChatScenarioId);
+    } else {
+      this.onTestChatScenarioSelected('custom');
+    }
   }
 
-  setChatModality(mod) {
-    this.chatModality = mod;
-    this.el.chatModalityText.classList.toggle('active', mod === 'text');
-    this.el.chatModalityVoice.classList.toggle('active', mod === 'voice');
-    this.el.chatModalityHybrid.classList.toggle('active', mod === 'hybrid');
+  renderTestChatScenarioPicker() {
+    if (!this.el.chatScenarioPicker) return;
+    const current = this.selectedTestChatScenarioId || 'custom';
+    const scenarios = this.testScenarios || [];
+    let html = '<option value="custom">-- Custom / Freeform Scenario --</option>';
+    html += scenarios.map(s => `<option value="${s.id}" ${s.id === current ? 'selected' : ''}>[${s.ref_id || s.id}] ${s.title}</option>`).join('');
+    this.el.chatScenarioPicker.innerHTML = html;
   }
 
-  beginChatSession() {
+  onTestChatScenarioSelected(scenarioId) {
+    this.selectedTestChatScenarioId = scenarioId;
+    if (this.el.chatScenarioPicker) this.el.chatScenarioPicker.value = scenarioId;
+
+    const isCustom = !scenarioId || scenarioId === 'custom';
+    if (this.el.chatScenarioBadge) {
+      this.el.chatScenarioBadge.textContent = isCustom ? 'Custom Scenario' : (scenarioId);
+      this.el.chatScenarioBadge.className = `badge-mini ${isCustom ? '' : 'badge-cyan'}`;
+    }
+
+    if (isCustom) {
+      if (this.el.chatScenarioTitle) this.el.chatScenarioTitle.value = 'Freeform Assistant Sparring';
+      if (this.el.chatCustomerRole) this.el.chatCustomerRole.value = 'Customer';
+      if (this.el.chatInstructions) this.el.chatInstructions.value = 'Caller calling to ask questions about company services and procedures.';
+      if (this.el.btnChatUpdateScenario) this.el.btnChatUpdateScenario.classList.add('hidden');
+      this.setTestChatDirection('inbound');
+    } else {
+      const scenario = (this.testScenarios || []).find(s => s.id === scenarioId || s.ref_id === scenarioId);
+      if (scenario) {
+        if (this.el.chatScenarioTitle) this.el.chatScenarioTitle.value = scenario.title || '';
+        if (this.el.chatCustomerRole) this.el.chatCustomerRole.value = scenario.callee?.role || scenario.customer_role || 'Customer';
+        const instr = scenario.callee?.secret_instructions || scenario.secret_instructions || scenario.description || '';
+        if (this.el.chatInstructions) this.el.chatInstructions.value = instr;
+        this.setTestChatDirection(scenario.direction || 'inbound');
+
+        if (this.el.btnChatUpdateScenario && this.el.chatUpdateScenarioId) {
+          this.el.chatUpdateScenarioId.textContent = scenario.ref_id || scenario.id;
+          this.el.btnChatUpdateScenario.classList.remove('hidden');
+        }
+      }
+    }
+    this.adjustAllAutoGrow();
+  }
+
+  setTestChatDirection(dir) {
+    this.testChatDirection = dir === 'outbound' ? 'outbound' : 'inbound';
+    if (this.el.chatDirInbound) this.el.chatDirInbound.classList.toggle('active', this.testChatDirection === 'inbound');
+    if (this.el.chatDirOutbound) this.el.chatDirOutbound.classList.toggle('active', this.testChatDirection === 'outbound');
+  }
+
+  async saveNewScenarioFromChat() {
+    const title = this.el.chatScenarioTitle?.value.trim() || 'New Test Scenario';
+    const customer_role = this.el.chatCustomerRole?.value.trim() || 'Customer';
+    const secret_instructions = this.el.chatInstructions?.value.trim() || '';
+    const direction = this.testChatDirection || 'inbound';
+
+    const payload = {
+      title,
+      customer_role,
+      direction,
+      test_objective: secret_instructions,
+      description: secret_instructions,
+      secret_instructions,
+      callee: {
+        role: customer_role,
+        secret_instructions,
+      },
+      status: 'enabled',
+      max_turns: 6,
+      linked_policies: [],
+      linked_procedures: [],
+      evaluation_checklist: [
+        { id: 'c1', goal: 'Representative communicated politely and handled caller inquiry', required: true },
+      ],
+    };
+
+    try {
+      const res = await fetch(`/api/accounts/${this.activeAccountId}/test-scenarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const saved = await res.json();
+      await this.loadTestScenarios(this.activeAccountId, this.testFilter, saved.id);
+      this.selectedTestChatScenarioId = saved.id;
+      this.renderTestChatScenarioPicker();
+      this.onTestChatScenarioSelected(saved.id);
+      this.showToast(`Saved new test scenario [${saved.id}]!`);
+    } catch (e) {
+      this.showToast('Save new scenario failed', 'error', e.message);
+    }
+  }
+
+  async updateScenarioFromChat() {
+    if (!this.selectedTestChatScenarioId || this.selectedTestChatScenarioId === 'custom') return;
+    const existing = (this.testScenarios || []).find(s => s.id === this.selectedTestChatScenarioId || s.ref_id === this.selectedTestChatScenarioId);
+    if (!existing) return;
+
+    const title = this.el.chatScenarioTitle?.value.trim() || existing.title;
+    const customer_role = this.el.chatCustomerRole?.value.trim() || existing.customer_role;
+    const secret_instructions = this.el.chatInstructions?.value.trim() || existing.secret_instructions;
+    const direction = this.testChatDirection || existing.direction || 'inbound';
+
+    const payload = {
+      ...existing,
+      title,
+      customer_role,
+      direction,
+      test_objective: secret_instructions,
+      description: secret_instructions,
+      secret_instructions,
+      callee: {
+        ...(existing.callee || {}),
+        role: customer_role,
+        secret_instructions,
+      },
+    };
+
+    try {
+      const res = await fetch(`/api/accounts/${this.activeAccountId}/test-scenarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const saved = await res.json();
+      await this.loadTestScenarios(this.activeAccountId, this.testFilter, saved.id);
+      this.showToast(`Updated test scenario [${saved.id}]!`);
+    } catch (e) {
+      this.showToast('Update scenario failed', 'error', e.message);
+    }
+  }
+
+  toggleLiveCall() {
+    if (this.isCallActive) {
+      this.endLiveCall();
+    } else {
+      this.startLiveCall();
+    }
+  }
+
+  async startLiveCall() {
     const asst = this.assistant;
-    if (!asst) return this.showToast('Please select an assistant first', 'error');
+    if (!asst) return this.showToast('Assistant configuration is loading...', 'error');
 
-    this.chatSessionActive = true;
-    this.el.chatPreCallBanner.classList.add('hidden');
-    this.el.chatSparringFeed.classList.remove('hidden');
-    this.el.chatInputRowBox.classList.remove('hidden');
-    this.el.chatUserInput.focus();
+    this.isCallActive = true;
+    this.isCallOnHold = false;
+    this.isMicMuted = false;
+    this.callSeconds = 0;
 
-    this.chatSparringHistory = [];
-    this.el.chatSparringFeed.innerHTML = '';
+    // Phone UI Updates
+    if (this.el.btnStartCall) this.el.btnStartCall.classList.add('hidden');
+    if (this.el.btnMuteMic) {
+      this.el.btnMuteMic.classList.remove('hidden', 'active-muted');
+      const icon = this.el.btnMuteMic.querySelector('.phone-btn-icon');
+      const label = this.el.btnMuteMic.querySelector('.phone-btn-label');
+      if (icon) icon.textContent = '🎤';
+      if (label) label.textContent = 'Mute';
+    }
+    if (this.el.btnHoldCall) {
+      this.el.btnHoldCall.classList.remove('hidden', 'active-hold');
+      const icon = this.el.btnHoldCall.querySelector('.phone-btn-icon');
+      const label = this.el.btnHoldCall.querySelector('.phone-btn-label');
+      if (icon) icon.textContent = '⏸️';
+      if (label) label.textContent = 'Hold';
+    }
+    if (this.el.btnEndCall) this.el.btnEndCall.classList.remove('hidden');
 
-    const greeting = `Hello! Thank you for calling. My name is ${asst.name}. How can I help you today?`;
-    this.appendChatSparring('caller', greeting);
-    this.showToast(`Connected with ${asst.name} (${this.chatModality.toUpperCase()})`);
-  }
+    if (this.el.callTimerBox) {
+      this.el.callTimerBox.classList.remove('hidden');
+      this.el.callTimerBox.textContent = '00:00';
+    }
+    if (this.el.callAudioVisualizerBox) {
+      this.el.callAudioVisualizerBox.classList.add('in-call');
+    }
+    this.setCallStatus('Dialing & Connecting...', 'status-light-amber');
 
-  resetChatSession() {
-    this.chatSessionActive = false;
-    this.chatSparringHistory = [];
-    this.el.chatPreCallBanner.classList.remove('hidden');
-    this.el.chatSparringFeed.classList.add('hidden');
-    this.el.chatInputRowBox.classList.add('hidden');
-    if (this.el.chatAudioPlayer) {
-      this.el.chatAudioPlayer.pause();
+    // Start timer
+    if (this.callTimerInterval) clearInterval(this.callTimerInterval);
+    this.callTimerInterval = setInterval(() => {
+      if (!this.isCallOnHold) {
+        this.callSeconds++;
+        const mins = String(Math.floor(this.callSeconds / 60)).padStart(2, '0');
+        const secs = String(this.callSeconds % 60).padStart(2, '0');
+        if (this.el.callTimerBox) this.el.callTimerBox.textContent = `${mins}:${secs}`;
+      }
+    }, 1000);
+
+    // Clear placeholder in feed if empty
+    if (this.chatSparringHistory.length === 0 && this.el.chatLiveTranscript) {
+      this.el.chatLiveTranscript.innerHTML = '';
+    }
+
+    // Connect WebSocket if not connected
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.connectWebSocket();
+    }
+
+    // Start microphone streaming via AudioManager
+    try {
+      this.audioManager.startMicrophone(
+        (base64Chunk) => {
+          if (!this.isCallActive || this.isMicMuted || this.isCallOnHold) return;
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+              type: 'audio_input',
+              data: base64Chunk,
+            }));
+          }
+        },
+        (humanTranscriptText) => {
+          if (humanTranscriptText && humanTranscriptText.trim()) {
+            this.appendChatBubble('callee', humanTranscriptText.trim());
+          }
+        }
+      );
+    } catch (micErr) {
+      console.warn('Microphone permission / start error:', micErr);
+      this.showToast('Microphone access unavailable. You can also type messages in the chat input.', 'error');
+    }
+
+    // Send start_call message to backend
+    const scenarioTitle = this.el.chatScenarioTitle?.value.trim() || 'Live Sparring Call';
+    const customerRole = this.el.chatCustomerRole?.value.trim() || 'Customer';
+    const secretInstructions = this.el.chatInstructions?.value.trim() || '';
+    const scenarioId = this.selectedTestChatScenarioId !== 'custom' ? this.selectedTestChatScenarioId : null;
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'start_call',
+        accountId: this.activeAccountId,
+        scenarioId,
+        scenarioTitle,
+        customerRole,
+        secretInstructions,
+        direction: this.testChatDirection,
+      }));
     }
   }
 
-  async sendChatTurn() {
-    if (!this.chatSessionActive) return;
-    const text = this.el.chatUserInput.value.trim();
+  toggleCallHold() {
+    if (!this.isCallActive) return;
+    this.isCallOnHold = !this.isCallOnHold;
+
+    if (this.el.btnHoldCall) {
+      this.el.btnHoldCall.classList.toggle('active-hold', this.isCallOnHold);
+      const icon = this.el.btnHoldCall.querySelector('.phone-btn-icon');
+      const label = this.el.btnHoldCall.querySelector('.phone-btn-label');
+      if (icon) icon.textContent = this.isCallOnHold ? '▶️' : '⏸️';
+      if (label) label.textContent = this.isCallOnHold ? 'Resume' : 'Hold';
+    }
+
+    if (this.isCallOnHold) {
+      this.setCallStatus('Call on Hold (Line Paused)', 'status-light-amber');
+      this.audioManager.stopPlayback();
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'hold' }));
+      }
+      this.showToast('Call placed on hold');
+    } else {
+      this.setCallStatus('Connected · Line Open', 'status-light-green');
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'unhold' }));
+      }
+      this.showToast('Call resumed');
+    }
+  }
+
+  endLiveCall(sendHangup = true) {
+    this.isCallActive = false;
+    this.isCallOnHold = false;
+    if (this.callTimerInterval) {
+      clearInterval(this.callTimerInterval);
+      this.callTimerInterval = null;
+    }
+
+    this.audioManager.stopMicrophone();
+    this.audioManager.stopPlayback();
+
+    if (sendHangup && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'hangup' }));
+    }
+
+    // Phone UI Updates
+    if (this.el.btnStartCall) this.el.btnStartCall.classList.remove('hidden');
+    if (this.el.btnMuteMic) this.el.btnMuteMic.classList.add('hidden');
+    if (this.el.btnHoldCall) this.el.btnHoldCall.classList.add('hidden');
+    if (this.el.btnEndCall) this.el.btnEndCall.classList.add('hidden');
+
+    if (this.el.callAudioVisualizerBox) {
+      this.el.callAudioVisualizerBox.classList.remove('in-call');
+    }
+    this.setCallStatus('Call Ended', 'status-light-gray');
+    if (this.chatSparringHistory.length > 0 && this.el.btnReviewInteraction) {
+      this.el.btnReviewInteraction.classList.remove('hidden');
+    }
+  }
+
+  resetCallState() {
+    if (this.isCallActive) {
+      this.endLiveCall(true);
+    }
+    this.clearChatHistory();
+    this.callSeconds = 0;
+    if (this.el.callTimerBox) {
+      this.el.callTimerBox.classList.add('hidden');
+      this.el.callTimerBox.textContent = '00:00';
+    }
+    this.isMicMuted = false;
+    if (this.el.btnMuteMic) {
+      this.el.btnMuteMic.classList.remove('active-muted');
+      const icon = this.el.btnMuteMic.querySelector('.phone-btn-icon');
+      const label = this.el.btnMuteMic.querySelector('.phone-btn-label');
+      if (icon) icon.textContent = '🎤';
+      if (label) label.textContent = 'Mute';
+    }
+    this.setCallStatus('Ready to Call', 'status-light-gray');
+    this.showToast('Call state & chat history reset');
+  }
+
+  toggleMicMute() {
+    this.isMicMuted = !this.isMicMuted;
+    if (this.el.btnMuteMic) {
+      this.el.btnMuteMic.classList.toggle('active-muted', this.isMicMuted);
+      const icon = this.el.btnMuteMic.querySelector('.phone-btn-icon');
+      const label = this.el.btnMuteMic.querySelector('.phone-btn-label');
+      if (icon) icon.textContent = this.isMicMuted ? '🔇' : '🎤';
+      if (label) label.textContent = this.isMicMuted ? 'Unmute' : 'Mute';
+    }
+    this.showToast(this.isMicMuted ? 'Microphone muted' : 'Microphone unmuted');
+  }
+
+  setCallStatus(label, lightClass) {
+    if (this.el.callStatusLabel) this.el.callStatusLabel.textContent = label;
+    if (this.el.callStatusIndicator) {
+      this.el.callStatusIndicator.className = `status-light ${lightClass}`;
+    }
+  }
+
+  clearChatHistory() {
+    this.chatSparringHistory = [];
+    if (this.el.chatLiveTranscript) {
+      this.el.chatLiveTranscript.innerHTML = '<div class="text-center py-4 text-dim text-xs">Chat feed cleared. Ready for next call or message.</div>';
+    }
+    if (this.el.btnReviewInteraction) {
+      this.el.btnReviewInteraction.classList.add('hidden');
+    }
+  }
+
+  sendTextFallbackTurn() {
+    const input = this.el.chatTextFallbackInput;
+    if (!input) return;
+    const text = input.value.trim();
     if (!text) return;
-    this.el.chatUserInput.value = '';
-    this.appendChatSparring('callee', text);
+    input.value = '';
 
-    const mode = this.el.chatTargetMode.value;
-    let scenarioContext = '';
-    if (mode === 'pasted') {
-      scenarioContext = this.el.chatPastedInput.value.trim();
-    } else if (mode === 'scenario') {
-      const sc = (this.testScenarios || []).find(s => s.id === this.el.chatScenarioSelect.value);
-      if (sc) scenarioContext = `${sc.title}\n${sc.description}`;
+    // Append to feed
+    this.appendChatBubble('callee', text);
+
+    // Send via WebSocket if connected
+    if (this.isCallActive && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'text_input',
+        text,
+      }));
+    } else {
+      // Fallback turn via REST if call not active
+      this.sendRestChatTurn(text);
     }
+  }
 
+  async sendRestChatTurn(text) {
+    const scenarioContext = this.el.chatInstructions?.value.trim() || '';
     try {
       const res = await fetch('/api/chat/assistant-turn', {
         method: 'POST',
@@ -2334,53 +2717,214 @@ class TalkDojoEnterpriseApp {
           accountId: this.activeAccountId,
           message: text,
           history: this.chatSparringHistory,
-          modality: this.chatModality,
+          modality: 'voice',
           scenarioContext,
         }),
       });
       const data = await res.json();
-      this.appendChatSparring('caller', data.reply);
-
-      if ((this.chatModality === 'voice' || this.chatModality === 'hybrid') && data.audioBase64) {
-        this.el.chatAudioPlayer.src = `data:audio/wav;base64,${data.audioBase64}`;
-        this.el.chatAudioPlayer.play().catch(e => console.warn('Audio autoplay prevented:', e));
+      this.appendChatBubble('caller', data.reply || '(Assistant spoke)');
+      if (data.audioBase64) {
+        const binary = atob(data.audioBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const int16Data = new Int16Array(bytes.buffer);
+        this.audioManager.playPCMChunk(int16Data);
       }
     } catch (e) {
-      this.appendChatSparring('caller', 'Thank you for calling.');
+      this.appendChatBubble('caller', 'Thank you for calling.');
     }
   }
 
-  appendChatSparring(speaker, text) {
-    this.chatSparringHistory.push({ speaker, text, timeStr: '0:05' });
-    const div = document.createElement('div');
+  appendChatBubble(speaker, text) {
+    if (!text || !text.trim()) return;
+    this.chatSparringHistory.push({ speaker, text, timestamp: Date.now() });
+
+    const feed = this.el.chatLiveTranscript;
+    if (!feed) return;
+
+    // Remove empty placeholder
+    const placeholder = feed.querySelector('.text-center');
+    if (placeholder) placeholder.remove();
+
     const isCaller = speaker === 'caller';
+    const div = document.createElement('div');
     div.className = `turn-bubble ${isCaller ? 'turn-caller' : 'turn-callee'}`;
+    div.dataset.speaker = speaker;
+    const name = isCaller ? (this.assistant?.name ? `🤖 ${this.assistant.name}` : '🤖 Assistant') : '👤 You';
     div.innerHTML = `
       <div class="turn-meta">
-        <span class="turn-speaker">${isCaller ? '🤖 Assistant' : '👤 You'}</span>
+        <span class="turn-speaker">${name}</span>
       </div>
-      <div class="turn-text">${text}</div>
+      <div class="turn-text">${this.escapeHtml(text)}</div>
     `;
-    this.el.chatSparringFeed.appendChild(div);
-    this.el.chatSparringFeed.scrollTop = this.el.chatSparringFeed.scrollHeight;
+    feed.appendChild(div);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  updateChatBubble(speaker, newText) {
+    const feed = this.el.chatLiveTranscript;
+    if (!feed) return;
+    const bubbles = Array.from(feed.querySelectorAll('.turn-bubble'));
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      const b = bubbles[i];
+      if (b.dataset.speaker === speaker || b.textContent.includes('[Transcribing...]') || b.textContent.includes('[Spoken voice')) {
+        const textNode = b.querySelector('.turn-text');
+        if (textNode) textNode.textContent = newText;
+        break;
+      }
+    }
+    for (let i = this.chatSparringHistory.length - 1; i >= 0; i--) {
+      const turn = this.chatSparringHistory[i];
+      if (turn.text && (turn.text.includes('[Transcribing...]') || turn.text.includes('[Spoken voice'))) {
+        turn.text = newText;
+        break;
+      }
+    }
+  }
+
+  appendToolEventBadge(toolName, args, output) {
+    const feed = this.el.chatLiveTranscript;
+    if (!feed) return;
+    const div = document.createElement('div');
+    div.className = 'tool-event-row p-2 mb-2';
+    div.style.cssText = 'background: rgba(0, 210, 255, 0.05); border: 1px dashed rgba(0, 210, 255, 0.25); border-radius: var(--radius-sm); font-size: 0.72rem;';
+    div.innerHTML = `
+      <div class="flex-between">
+        <span class="text-cyan font-bold">⚙️ Tool Executed: ${toolName}</span>
+        <span class="text-dim">${new Date().toLocaleTimeString()}</span>
+      </div>
+      <div class="text-dim mt-1 font-mono">${JSON.stringify(args || {})}</div>
+    `;
+    feed.appendChild(div);
+    feed.scrollTop = feed.scrollHeight;
   }
 
   async reviewChatInteraction() {
-    if (this.chatSparringHistory.length === 0) return this.showToast('Please have a conversation with the assistant first.', 'error');
-    try {
-      const res = await fetch('/api/chat/review-interaction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: this.chatSparringHistory,
-        }),
-      });
-      const evalData = await res.json();
-      this.showToast(`Evaluation score: ${evalData.overall_score}%`);
-      alert(`AI Referee Review:\nScore: ${evalData.overall_score}%\nSummary: ${evalData.summary}\n\nCoaching Tips:\n${(evalData.coaching_feedback || []).join('\n')}`);
-    } catch (e) {
-      this.showToast('Review failed', 'error', e.message);
+    let report = this.lastRunReport;
+
+    if (!report) {
+      if (this.chatSparringHistory.length === 0) {
+        return this.showToast('Please have a conversation with the assistant first.', 'error');
+      }
+      report = {
+        id: 'live-' + Date.now(),
+        scenario: { title: this.el.chatScenarioTitle?.value || 'Sparring Session' },
+        durationSec: this.callSeconds || 0,
+        transcript: this.chatSparringHistory,
+      };
     }
+
+    // Populate modal fields
+    if (this.el.reviewCallScenarioTitle) {
+      this.el.reviewCallScenarioTitle.textContent = report.scenario?.title || 'Sparring Session';
+    }
+    if (this.el.reviewCallDuration) {
+      const mins = String(Math.floor((report.durationSec || 0) / 60)).padStart(2, '0');
+      const secs = String((report.durationSec || 0) % 60).padStart(2, '0');
+      this.el.reviewCallDuration.textContent = `Duration: ${mins}:${secs}`;
+    }
+    if (this.el.reviewCallDate) {
+      this.el.reviewCallDate.textContent = report.timestamp ? new Date(report.timestamp).toLocaleTimeString() : 'Just now';
+    }
+
+    // Audio player setup
+    if (this.el.reviewAudioPlayer) {
+      if (report.id && !report.id.startsWith('live-')) {
+        this.el.reviewAudioPlayer.src = `/api/runs/${report.id}/audio`;
+        this.el.reviewAudioPlayer.classList.remove('hidden');
+        if (this.el.reviewRecordingFilename) {
+          this.el.reviewRecordingFilename.textContent = `${report.id}.wav`;
+        }
+      } else {
+        this.el.reviewAudioPlayer.removeAttribute('src');
+        this.el.reviewAudioPlayer.classList.add('hidden');
+        if (this.el.reviewRecordingFilename) {
+          this.el.reviewRecordingFilename.textContent = 'Voice audio recorded on full telephone calls';
+        }
+      }
+    }
+
+    // Render transcript turns
+    if (this.el.reviewTranscriptTurns) {
+      const turns = report.transcript && report.transcript.length > 0 ? report.transcript : this.chatSparringHistory;
+      this.el.reviewTranscriptTurns.innerHTML = turns.map(t => {
+        const isCaller = t.speaker === 'caller' || t.role === 'user' || t.role === 'caller';
+        const bubbleClass = isCaller ? 'review-turn-caller' : 'review-turn-assistant';
+        const roleName = isCaller ? 'Caller' : (this.assistant?.name || 'Assistant');
+        return `
+          <div class="review-turn-bubble ${bubbleClass}">
+            <span class="review-turn-role">${roleName} <span class="text-dim text-xs font-normal ml-1">${t.timeStr || ''}</span></span>
+            <div class="text-xs">${this.escapeHtml(t.text || '')}</div>
+          </div>
+        `;
+      }).join('') || '<div class="text-xs text-dim py-3 text-center">No turns recorded.</div>';
+    }
+
+    // Load AI Referee Evaluation
+    if (report.evaluation) {
+      this.displayReviewEvaluation(report.evaluation);
+    } else {
+      if (this.el.reviewScorePill) this.el.reviewScorePill.textContent = 'Evaluating...';
+      if (this.el.reviewEvalSummary) this.el.reviewEvalSummary.textContent = 'AI Referee is analyzing conversation adherence...';
+      try {
+        const res = await fetch('/api/chat/review-interaction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: report.transcript || this.chatSparringHistory,
+          }),
+        });
+        const evalData = await res.json();
+        report.evaluation = evalData;
+        this.displayReviewEvaluation(evalData);
+      } catch (e) {
+        if (this.el.reviewEvalSummary) this.el.reviewEvalSummary.textContent = 'Evaluation could not be completed.';
+      }
+    }
+
+    if (this.el.modalCallReview) {
+      this.el.modalCallReview.classList.remove('hidden');
+    }
+  }
+
+  displayReviewEvaluation(evalData) {
+    if (this.el.reviewScorePill) {
+      const score = evalData.overall_score ?? evalData.score ?? 0;
+      this.el.reviewScorePill.textContent = `Score: ${score}%`;
+      this.el.reviewScorePill.style.color = score >= 80 ? '#34d399' : (score >= 50 ? '#fbbf24' : '#f87171');
+    }
+    if (this.el.reviewEvalSummary) {
+      this.el.reviewEvalSummary.textContent = evalData.summary || 'Interaction evaluated.';
+    }
+    if (this.el.reviewCoachingList) {
+      const tips = evalData.coaching_feedback || [];
+      this.el.reviewCoachingList.innerHTML = tips.length > 0
+        ? tips.map(tip => `<li>${this.escapeHtml(tip)}</li>`).join('')
+        : '<li>No specific coaching corrections needed. Solid performance!</li>';
+    }
+  }
+
+  closeCallReviewModal() {
+    if (this.el.reviewAudioPlayer) {
+      try { this.el.reviewAudioPlayer.pause(); } catch (e) {}
+    }
+    if (this.el.modalCallReview) {
+      this.el.modalCallReview.classList.add('hidden');
+    }
+  }
+
+  exportCurrentRunReport() {
+    const report = this.lastRunReport || {
+      id: 'sparring-' + Date.now(),
+      transcript: this.chatSparringHistory,
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `run-report-${report.id || Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // --- TAB 6: CERTIFICATION (HISTORY VS IN-PROGRESS LIVE RUNNER) ---
@@ -2656,6 +3200,19 @@ class TalkDojoEnterpriseApp {
   // --- WEBSOCKET LIVE STREAMING ---
 
   connectWebSocket() {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    if (this.ws) {
+      try {
+        this.ws.onclose = null;
+        this.ws.onmessage = null;
+        this.ws.close();
+      } catch (e) {}
+      this.ws = null;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}`;
     this.ws = new WebSocket(wsUrl);
@@ -2668,11 +3225,112 @@ class TalkDojoEnterpriseApp {
     };
 
     this.ws.onclose = () => {
+      this.ws = null;
       setTimeout(() => this.connectWebSocket(), 2500);
     };
   }
 
   handleWebSocketMessage(msg) {
+    if (msg.type === 'audio_stream') {
+      // NEVER play our own microphone audio back through our computer speakers
+      if (msg.isHuman) return;
+      const isHumanSpeaker =
+        (this.testChatDirection === 'inbound' && msg.speaker === 'caller') ||
+        (this.testChatDirection === 'outbound' && msg.speaker === 'callee');
+      if (isHumanSpeaker) return;
+
+      if (this.isCallActive && msg.buffer) {
+        try {
+          const binary = atob(msg.buffer);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const int16Data = new Int16Array(bytes.buffer);
+          this.audioManager.playPCMChunk(int16Data);
+        } catch (e) {
+          console.warn('PCM chunk play error:', e);
+        }
+      }
+    }
+
+    if (msg.type === 'agent_interrupted') {
+      // When assistant is interrupted, instantly stop any queued speech
+      if (this.audioManager) {
+        this.audioManager.stopPlayback();
+      }
+    }
+
+    if (msg.type === 'hold_state') {
+      this.isCallOnHold = !!msg.onHold;
+      if (this.el.btnHoldCall) {
+        this.el.btnHoldCall.classList.toggle('active-hold', this.isCallOnHold);
+        const icon = this.el.btnHoldCall.querySelector('.phone-btn-icon');
+        const label = this.el.btnHoldCall.querySelector('.phone-btn-label');
+        if (icon) icon.textContent = this.isCallOnHold ? '▶️' : '⏸️';
+        if (label) label.textContent = this.isCallOnHold ? 'Resume' : 'Hold';
+      }
+      if (this.isCallOnHold) {
+        this.setCallStatus('Call on Hold (Line Paused)', 'status-light-amber');
+      } else {
+        this.setCallStatus('Connected · Line Open', 'status-light-green');
+      }
+    }
+
+    if (msg.type === 'state_change') {
+      if (this.isCallActive) {
+        if (msg.state === 'CONNECTED') {
+          this.setCallStatus('Connected · Line Open', 'status-light-green');
+        } else if (msg.state === 'DIALING' || msg.state === 'RINGING' || msg.state === 'CONNECTING') {
+          this.setCallStatus(`${msg.state}...`, 'status-light-amber');
+        } else if (msg.state === 'COMPLETED') {
+          this.endLiveCall(false);
+        }
+      }
+    }
+
+    if (msg.type === 'turn_complete') {
+      if (msg.speaker && msg.text) {
+        this.appendChatBubble(msg.speaker, msg.text);
+      }
+    }
+
+    if (msg.type === 'turn_updated') {
+      if (msg.turn) {
+        this.updateChatBubble(msg.turn.speaker, msg.turn.text);
+      }
+    }
+
+    if (msg.type === 'tool_executed') {
+      if (msg.tool) {
+        this.appendToolEventBadge(msg.tool.name, msg.tool.args, msg.tool.output);
+      }
+    }
+
+    if (msg.type === 'call_ended') {
+      if (this.isCallActive) {
+        this.endLiveCall(false);
+      }
+    }
+
+    if (msg.type === 'call_completed') {
+      if (msg.runReport) {
+        this.lastRunReport = msg.runReport;
+        if (this.el.btnReviewInteraction) {
+          this.el.btnReviewInteraction.classList.remove('hidden');
+          this.el.btnReviewInteraction.textContent = '🔍 Review';
+        }
+      }
+    }
+
+    if (msg.type === 'evaluation_complete') {
+      if (msg.evaluation) {
+        this.showToast(`AI Referee evaluation complete: ${msg.evaluation.overall_score}%`);
+      }
+    }
+
+    if (msg.type === 'error') {
+      this.showToast(msg.error || 'Server error occurred during call', 'error');
+    }
+
     if (msg.type === 'TEST_COMPLETED') {
       const light = document.getElementById(`cert-light-${msg.testId}`);
       if (light) {
@@ -2686,6 +3344,16 @@ class TalkDojoEnterpriseApp {
       this.loadCertificationHistory();
       this.showToast(msg.passed ? 'Certification PASSED! 🎉' : 'Certification complete (some tests failed).');
     }
+  }
+
+  escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }
 

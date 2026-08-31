@@ -1,5 +1,6 @@
 import EventEmitter from 'events';
 import WebSocket from 'ws';
+import { AudioTranscriber } from '../audio/audio-transcriber.js';
 
 export class GeminiLiveClient extends EventEmitter {
   constructor({
@@ -23,6 +24,7 @@ export class GeminiLiveClient extends EventEmitter {
     this.isConnected = false;
     this.isReady = false;
     this.currentTurnTranscript = '';
+    this.currentTurnAudioChunks = [];
   }
 
   /**
@@ -94,6 +96,8 @@ export class GeminiLiveClient extends EventEmitter {
 
 CRITICAL TELEPHONE INSTRUCTIONS:
 - You are speaking live out-loud on a real telephone call.
+- Active Listening & Telephone Cadence: Follow your Persona's Speaking Style and Listening Style. If your listening style instructs conversational confirmations ("uh-huh", "hmm", "ok", "I see"), provide brief natural verbal acknowledgments while the caller is explaining or speaking.
+- Speak naturally with a realistic human telephone cadence, not a robotic or overly cheerful commercial voice.
 - NEVER speak or output your inner thoughts, planning, reasoning, section headers, markdown, or asterisks.
 - Speak ONLY your direct spoken character lines to the other person.
 - Keep turns natural, concise (1-3 sentences per turn), and conversational.`,
@@ -169,6 +173,8 @@ CRITICAL TELEPHONE INSTRUCTIONS:
         if (part.inlineData && part.inlineData.data) {
           this.hasAudioInTurn = true;
           const audioBuffer = Buffer.from(part.inlineData.data, 'base64');
+          if (!this.currentTurnAudioChunks) this.currentTurnAudioChunks = [];
+          this.currentTurnAudioChunks.push(audioBuffer);
           this.emit('audio', {
             buffer: audioBuffer,
             sampleRate: 24000,
@@ -181,24 +187,43 @@ CRITICAL TELEPHONE INSTRUCTIONS:
     if (serverContent.turnComplete) {
       const rawText = this.currentTurnTranscript;
       let turnText = this.cleanTranscriptText(rawText);
+      const audioChunks = this.currentTurnAudioChunks || [];
+      this.currentTurnAudioChunks = [];
+
       if (!turnText && this.hasAudioInTurn) {
         if (this.pendingGreeting) {
           turnText = this.pendingGreeting;
           this.pendingGreeting = null;
         } else if (this.lastExecutedTool) {
           turnText = `[Voice spoken using ${this.lastExecutedTool.name}: ${JSON.stringify(this.lastExecutedTool.output)}]`;
-        } else {
-          turnText = `[Spoken voice response]`;
         }
       }
+
       this.pendingGreeting = null;
       this.hasAudioInTurn = false;
       this.currentTurnTranscript = '';
-      this.emit('turnComplete', {
+
+      const turnObj = {
         role: this.role,
-        text: turnText,
+        text: turnText || (audioChunks.length > 0 ? '[Transcribing...]' : ''),
         rawText,
-      });
+      };
+
+      this.emit('turnComplete', turnObj);
+
+      // Asynchronously transcribe spoken audio turn if text was not provided by stream
+      if ((!turnText || turnText === '[Transcribing...]') && audioChunks.length > 0) {
+        const fullAudio = Buffer.concat(audioChunks);
+        AudioTranscriber.transcribe(fullAudio, 24000, this.apiKey).then((transcribed) => {
+          if (transcribed && transcribed.trim()) {
+            turnObj.text = transcribed.trim();
+            this.emit('turnUpdated', turnObj);
+          } else if (turnObj.text === '[Transcribing...]') {
+            turnObj.text = '[Spoken voice turn]';
+            this.emit('turnUpdated', turnObj);
+          }
+        }).catch(() => {});
+      }
     }
   }
 

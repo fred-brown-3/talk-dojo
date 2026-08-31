@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Duet Lab · Talk Dojo</title>
+  <link rel="stylesheet" href="/css/duet-lab.css?v=calibrated-vad-6">
+</head>
+<body>
+  <main class="lab-shell">
+    <header class="lab-header">
+      <div>
+        <p class="eyebrow">Talk Dojo Experimental Surface</p>
+        <h1>Duet Lab</h1>
+        <p class="lede">One caller stream, two content-aware Gemini Live sessions, one governed audio floor.</p>
+      </div>
+      <a class="back-link" href="/">Return to Talk Dojo</a>
+    </header>
+
+    <section class="notice">
+      <strong>Isolated prototype · calibrated-vad-6:</strong> this page does not use or alter the current Test Chat interface. Starting the lab opens two Gemini Live sessions and may use roughly twice the live-audio input quota.
+    </section>
+
+    <section class="control-grid">
+      <article class="panel setup-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="panel-kicker">Experiment setup</span>
+            <h2>Session controls</h2>
+          </div>
+          <span id="connection-pill" class="pill idle">Idle</span>
+        </div>
+
+        <label>
+          Account persona
+          <select id="account-select"></select>
+        </label>
+
+        <div class="two-col">
+          <label>
+            Main end pause
+            <span><output id="main-pause-value">1600</output> ms</span>
+            <input id="main-pause" type="range" min="650" max="2400" step="50" value="1600">
+          </label>
+          <label>
+            Listener clause pause
+            <span><output id="listener-pause-value">380</output> ms</span>
+            <input id="listener-pause" type="range" min="120" max="650" step="10" value="380">
+          </label>
+        </div>
+
+        <div class="two-col">
+          <label>
+            Listener volume
+            <span><output id="listener-volume-value">82</output>%</span>
+            <input id="listener-volume" type="range" min="0" max="100" step="1" value="82">
+          </label>
+          <label>
+            Backchannel cooldown
+            <span><output id="cooldown-value">0</output> ms</span>
+            <input id="cooldown" type="range" min="0" max="6000" step="100" value="0">
+          </label>
+        </div>
+
+        <label>
+          Maximum audible backchannel
+          <span><output id="max-listener-value">700</output> ms</span>
+          <input id="max-listener" type="range" min="300" max="1400" step="50" value="700">
+        </label>
+
+        <div class="button-row">
+          <button id="start-button" class="button primary">Start two-session lab</button>
+          <button id="stop-button" class="button danger" disabled>Stop</button>
+          <button id="mute-listener-button" class="button secondary" disabled>Mute listener</button>
+          <button id="replay-listener-button" class="button secondary" disabled>Replay latest listener</button>
+        </div>
+
+        <div class="mic-meter" aria-label="Microphone level">
+          <span>Mic</span>
+          <div class="meter-track"><div id="meter-fill" class="meter-fill"></div></div>
+          <output id="meter-db">−∞ dB</output>
+        </div>
+      </article>
+
+      <article class="panel floor-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="panel-kicker">Audio conductor</span>
+            <h2>Conversation floor</h2>
+          </div>
+          <span id="floor-pill" class="pill idle">Silent</span>
+        </div>
+
+        <div class="channel-card main-channel">
+          <div class="channel-icon">A</div>
+          <div class="channel-copy">
+            <strong>Main agent</strong>
+            <span id="main-status">Disconnected</span>
+          </div>
+          <div id="main-light" class="channel-light"></div>
+        </div>
+
+        <div class="priority-line"><span>Audible-first · listener audio is not discarded</span></div>
+
+        <div class="channel-card listener-channel">
+          <div class="channel-icon">L</div>
+          <div class="channel-copy">
+            <strong>Content-aware listener</strong>
+            <span id="listener-status">Disconnected</span>
+          </div>
+          <div id="listener-light" class="channel-light"></div>
+        </div>
+
+        <dl class="metrics">
+          <div><dt>Listener generations</dt><dd id="listener-generated">0</dd></div>
+          <div><dt>Played</dt><dd id="listener-played">0</dd></div>
+          <div><dt>Suppressed</dt><dd id="listener-suppressed">0</dd></div>
+          <div><dt>Forced preemptions</dt><dd id="main-preemptions">0</dd></div>
+        </dl>
+      </article>
+    </section>
+
+    <section class="panel prompt-panel">
+      <div class="panel-heading compact">
+        <div>
+          <span class="panel-kicker">Exact model instructions</span>
+          <h2>Channel prompts</h2>
+        </div>
+        <button id="reload-prompts-button" class="text-button">Reset from account</button>
+      </div>
+      <p class="panel-help">These are the complete system instructions sent when the lab starts. Edit either prompt to test a variation; account changes reload both defaults.</p>
+      <div class="prompt-grid">
+        <label>
+          Main session prompt
+          <textarea id="main-prompt" spellcheck="false" aria-label="Main session prompt"></textarea>
+        </label>
+        <label>
+          Listener session prompt
+          <textarea id="listener-prompt" spellcheck="false" aria-label="Listener session prompt"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel transcript-panel">
+      <div class="panel-heading compact">
+        <div>
+          <span class="panel-kicker">Chronological conversation</span>
+          <h2>Duet transcript</h2>
+        </div>
+        <button class="text-button" data-clear="duet-transcript">Clear</button>
+      </div>
+      <div class="transcript-legend" aria-label="Transcript colors">
+        <span class="caller">Caller</span>
+        <span class="main">Main</span>
+        <span class="listener">Listener</span>
+      </div>
+      <div id="duet-transcript" class="transcript"></div>
+    </section>
+
+    <section class="panel event-panel">
+      <div class="panel-heading compact">
+        <div>
+          <span class="panel-kicker">Latency and arbitration evidence</span>
+          <h2>Experiment log</h2>
+        </div>
+        <button class="text-button" data-clear="event-log">Clear</button>
+      </div>
+      <div id="event-log" class="event-log"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/duet-lab.js?v=calibrated-vad-6"></script>
+</body>
+</html>

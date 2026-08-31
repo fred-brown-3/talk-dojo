@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 import { WebSocketServer, WebSocket } from 'ws';
 import { config } from './config.js';
 import { CallSession } from './session/call-session.js';
+import { DuetPrototypeSession, buildDuetInstructions } from './session/duet-prototype-session.js';
 import { AccountManager } from './account/account-manager.js';
 import { BatchRunner } from './runner/batch-runner.js';
 import { VirtualToolManager } from './tools/virtual-tool-manager.js';
@@ -15,7 +16,7 @@ import fsSync from 'fs';
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
+const wss = new WebSocketServer({ server });
 
 const accountManager = new AccountManager();
 await accountManager.init();
@@ -47,6 +48,12 @@ batchRunner.on('batch_completed', (data) => broadcast({ type: 'batch_completed',
 batchRunner.on('batch_aborted', (data) => broadcast({ type: 'batch_aborted', ...data }));
 
 app.use(express.json());
+app.use(['/duet-lab.html', '/js/duet-lab.js', '/css/duet-lab.css'], (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 app.use(express.static(config.publicDir));
 app.use('/runs', express.static(config.runsDir));
 
@@ -79,6 +86,23 @@ app.get('/api/accounts', async (req, res) => {
   try {
     const accounts = await accountManager.listAccounts();
     res.json(accounts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/duet-prompts/:accountId', async (req, res) => {
+  try {
+    const assistant = await accountManager.getAssistant(req.params.accountId);
+    if (!assistant) return res.status(404).json({ error: 'Assistant not found' });
+    const assistantPrompt = await accountManager.compileAssistantPrompt(req.params.accountId);
+    const prompts = buildDuetInstructions({
+      assistantName: assistant.name || 'Assistant',
+      assistantPrompt,
+      listeningStyle: assistant.listening_style || '',
+      voice: assistant.voice || 'Aoede',
+    });
+    res.json(prompts);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -892,6 +916,15 @@ app.get('/api/scenarios/:id', async (req, res) => {
 // --- WebSocket Realtime Audio & Call Dispatcher ---
 
 wss.on('connection', (ws) => {
+  // The Duet Lab owns a private two-channel prototype session per browser
+  // socket. It is deliberately independent from the current Test Chat call.
+  let duetSession = null;
+  const sendSocketEvent = (event) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(event));
+    }
+  };
+
   // Send current configuration & session state
   ws.send(JSON.stringify({
     type: 'init',
@@ -908,79 +941,304 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    // Standalone dual-session experiment used only by /duet-lab.html.
+    if (msg.type === 'duet_start') {
+      const apiKeyToUse = msg.apiKey || runtimeApiKey;
+      if (!apiKeyToUse) {
+        sendSocketEvent({
+          type: 'duet_error',
+          channel: 'system',
+          message: 'Gemini API Key is required. Configure it in Account Settings first.',
+        });
+        return;
+      }
+
+      if (duetSession) {
+        duetSession.destroy();
+        duetSession = null;
+      }
+
+      try {
+        const accountId = msg.accountId || (await accountManager.listAccounts())[0]?.id;
+        const assistant = accountId ? await accountManager.getAssistant(accountId) : null;
+        const assistantPrompt = accountId
+          ? await accountManager.compileAssistantPrompt(accountId)
+          : 'You are a professional telephone assistant.';
+
+        duetSession = new DuetPrototypeSession({
+          apiKey: apiKeyToUse,
+          model: config.geminiLiveModel,
+          voice: msg.voice || assistant?.voice || 'Aoede',
+          assistantName: assistant?.name || 'Assistant',
+          assistantPrompt,
+          listeningStyle: assistant?.listening_style || '',
+          mainInstruction: typeof msg.mainInstruction === 'string'
+            ? msg.mainInstruction.slice(0, 100000)
+            : '',
+          listenerInstruction: typeof msg.listenerInstruction === 'string'
+            ? msg.listenerInstruction.slice(0, 30000)
+            : '',
+          mainSilenceMs: msg.mainSilenceMs,
+          listenerSilenceMs: msg.listenerSilenceMs,
+        });
+
+        duetSession.on('channelReady', (data) => {
+          sendSocketEvent({ type: 'duet_channel_ready', ...data });
+        });
+        duetSession.on('ready', (data) => {
+          sendSocketEvent({ type: 'duet_ready', ...data });
+        });
+        duetSession.on('audio', (data) => {
+          sendSocketEvent({
+            type: 'duet_audio',
+            channel: data.channel,
+            generationId: data.generationId,
+            sampleRate: data.sampleRate,
+            buffer: data.buffer.toString('base64'),
+          });
+        });
+        duetSession.on('transcript', (data) => {
+          sendSocketEvent({ type: 'duet_transcript', ...data });
+        });
+        for (const eventName of [
+          'generationStart',
+          'generationComplete',
+          'turnComplete',
+          'interrupted',
+          'waitingForInput',
+          'channelClose',
+        ]) {
+          duetSession.on(eventName, (data) => {
+            sendSocketEvent({ type: `duet_${eventName}`, ...data });
+          });
+        }
+        duetSession.on('usage', (data) => {
+          sendSocketEvent({ type: 'duet_usage', ...data });
+        });
+        duetSession.on('error', (data) => {
+          sendSocketEvent({ type: 'duet_error', ...data });
+        });
+
+        await duetSession.start();
+      } catch (err) {
+        if (duetSession) {
+          duetSession.destroy();
+          duetSession = null;
+        }
+        sendSocketEvent({ type: 'duet_error', channel: 'system', message: err.message });
+      }
+      return;
+    }
+
+    if (msg.type === 'duet_audio_input') {
+      if (duetSession && duetSession.started && msg.data) {
+        duetSession.sendAudio(Buffer.from(msg.data, 'base64'));
+      }
+      return;
+    }
+
+    if (msg.type === 'duet_listener_clause_start') {
+      if (duetSession) duetSession.beginListenerClause();
+      return;
+    }
+
+    if (msg.type === 'duet_listener_clause_end') {
+      if (duetSession) duetSession.endListenerClause();
+      return;
+    }
+
+    if (msg.type === 'duet_audio_end') {
+      if (duetSession) duetSession.endAudioStream();
+      return;
+    }
+
+    if (msg.type === 'duet_stop') {
+      if (duetSession) {
+        duetSession.endAudioStream();
+        duetSession.destroy();
+        duetSession = null;
+      }
+      sendSocketEvent({ type: 'duet_stopped' });
+      return;
+    }
+
     // Handle Start Call
     if (msg.type === 'start_call') {
       const apiKeyToUse = msg.apiKey || runtimeApiKey;
       if (!apiKeyToUse) {
         ws.send(JSON.stringify({
           type: 'error',
-          message: 'Gemini API Key is required to start a call. Please enter your key in the header.',
+          message: 'Gemini API Key is required to start a call. Please set your key in Account Settings.',
         }));
         return;
       }
 
       if (msg.apiKey && msg.apiKey !== runtimeApiKey) {
         runtimeApiKey = msg.apiKey;
+        batchRunner.apiKey = runtimeApiKey;
       }
 
-      if (activeSession && activeSession.state !== 'COMPLETED') {
-        await activeSession.hangup();
+      if (activeSession) {
+        try {
+          activeSession.destroy();
+        } catch (e) {}
+        activeSession = null;
       }
 
       try {
         let scenario = msg.scenario;
-        if (!scenario && msg.scenarioId && msg.accountId) {
-          const procs = await accountManager.listProcedures(msg.accountId);
-          for (const p of procs) {
-            const found = (p.test_scenarios || []).find(s => s.id === msg.scenarioId);
-            if (found) { scenario = found; break; }
-          }
+        const accountId = msg.accountId || (await accountManager.listAccounts())[0]?.id;
+        const account = accountId ? await accountManager.getAccount(accountId) : null;
+        const assistant = accountId ? await accountManager.getAssistant(accountId) : null;
+
+        if (!scenario && msg.scenarioId && accountId) {
+          try {
+            scenario = await accountManager.getTest(accountId, msg.scenarioId);
+          } catch (e) {}
         }
+
+        if (!scenario && accountId) {
+          scenario = {
+            id: 'custom-sparring',
+            title: msg.scenarioTitle || 'Live Assistant Sparring',
+            direction: msg.direction || 'inbound',
+            customer_role: msg.customerRole || 'Customer',
+            secret_instructions: msg.secretInstructions || '',
+            description: msg.description || 'Interactive browser call with assistant.',
+          };
+        }
+
         if (!scenario) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Scenario not found' }));
+          ws.send(JSON.stringify({ type: 'error', message: 'Scenario or account not found' }));
           return;
         }
 
+        const direction = (scenario.direction || msg.direction || 'inbound').toLowerCase();
+        const linkedProcedures = Array.isArray(scenario.linked_procedures) && scenario.linked_procedures.length > 0
+          ? scenario.linked_procedures
+          : undefined;
+        const assistantTools = accountId ? await accountManager.getAuthorizedActionDefinitions(accountId, linkedProcedures) : [];
+        const assistantPrompt = accountId ? await accountManager.compileAssistantPrompt(accountId) : 'You are a telephone voice assistant.';
+
+        let callMode = msg.mode;
+        if (!callMode) {
+          // If browser live voice call:
+          // Inbound: Customer (Human) calls in, Assistant (AI) answers
+          // Outbound: Assistant (AI) calls out, Customer (Human) answers
+          callMode = direction === 'outbound' ? 'human-to-ai-callee' : 'human-to-ai-caller';
+        }
+
+        const runtimeScenario = {
+          ...scenario,
+          direction,
+        };
+
+        if (callMode === 'human-to-ai-caller') {
+          runtimeScenario.caller = {
+            role: scenario.customer_role || 'Customer',
+            secret_instructions: scenario.secret_instructions || '',
+          };
+          runtimeScenario.callee = {
+            role: assistant?.name || 'Assistant',
+            voice: assistant?.voice || 'Aoede',
+            system_instruction: assistantPrompt,
+            tools: assistantTools,
+            initial_greeting: `Hello! Thank you for calling ${account ? account.name : 'our office'}. My name is ${assistant?.name || 'the assistant'}. How can I help you today?`,
+          };
+        } else if (callMode === 'human-to-ai-callee') {
+          runtimeScenario.caller = {
+            role: assistant?.name || 'Assistant',
+            voice: assistant?.voice || 'Aoede',
+            system_instruction: assistantPrompt,
+            tools: assistantTools,
+            initial_greeting: `Hello, this is ${assistant?.name || 'the assistant'} calling from ${account ? account.name : 'our office'}.`,
+          };
+          runtimeScenario.callee = {
+            role: scenario.customer_role || 'Customer',
+            secret_instructions: scenario.secret_instructions || '',
+            initial_greeting: 'Hello?',
+          };
+        }
+
         activeSession = new CallSession({
-          scenario,
-          mode: msg.mode || 'ai-to-ai',
+          scenario: runtimeScenario,
+          mode: callMode,
           apiKey: runtimeApiKey,
           staticLevel: msg.staticLevel !== undefined ? msg.staticLevel : null,
           noiseTarget: msg.noiseTarget || null,
         });
 
-        // Broadcast session state
+        // Helper to send events directly to the specific caller socket
+        const sendCallEvent = (event) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(event));
+          }
+        };
+
+        // Broadcast session state to caller
         activeSession.on('stateChange', (data) => {
-          broadcast({ type: 'state_change', ...data });
+          sendCallEvent({ type: 'state_change', ...data });
         });
 
-        // Broadcast live transcript chunks
+        activeSession.on('holdState', (data) => {
+          sendCallEvent({ type: 'hold_state', ...data });
+        });
+
+        // Stream audio directly to caller's browser speakers (AI audio only)
+        activeSession.on('audioMonitor', (data) => {
+          if (data && data.buffer) {
+            // NEVER send human microphone audio back to browser speakers
+            if (data.isHuman) return;
+            const isHumanSpeaker =
+              (activeSession.mode === 'human-to-ai-caller' && data.speaker === 'caller') ||
+              (activeSession.mode === 'human-to-ai-callee' && data.speaker === 'callee');
+            if (isHumanSpeaker) return;
+
+            sendCallEvent({
+              type: 'audio_stream',
+              speaker: data.speaker,
+              isHuman: false,
+              buffer: data.buffer.toString('base64'),
+              sampleRate: data.sampleRate || 24000,
+            });
+          }
+        });
+
+        // Send transcript chunks
         activeSession.on('transcriptPart', (data) => {
-          broadcast({ type: 'transcript_part', ...data });
+          sendCallEvent({ type: 'transcript_part', ...data });
         });
 
         activeSession.on('turnComplete', (turn) => {
-          broadcast({ type: 'turn_complete', ...turn });
+          sendCallEvent({ type: 'turn_complete', ...turn });
+        });
+
+        activeSession.on('turnUpdated', (turn) => {
+          sendCallEvent({ type: 'turn_updated', turn });
         });
 
         activeSession.on('agentInterrupted', (data) => {
-          broadcast({ type: 'agent_interrupted', ...data });
+          sendCallEvent({ type: 'agent_interrupted', ...data });
         });
 
         activeSession.on('toolExecuted', (data) => {
-          broadcast({ type: 'tool_executed', ...data });
+          sendCallEvent({ type: 'tool_executed', ...data });
         });
 
         activeSession.on('callEnded', (data) => {
-          broadcast({ type: 'call_ended', ...data });
+          sendCallEvent({ type: 'call_ended', ...data });
+        });
+
+        activeSession.on('callCompleted', (runReport) => {
+          sendCallEvent({ type: 'call_completed', runReport });
         });
 
         activeSession.on('evaluationComplete', (evaluation) => {
-          broadcast({ type: 'evaluation_complete', evaluation });
+          sendCallEvent({ type: 'evaluation_complete', evaluation });
         });
 
         activeSession.on('error', (err) => {
-          broadcast({ type: 'session_error', error: err.message });
+          sendCallEvent({ type: 'session_error', error: err.message });
         });
 
         // Start session
@@ -999,9 +1257,23 @@ wss.on('connection', (ws) => {
       }
     }
 
+    // Handle Hold Call (pause line)
+    if (msg.type === 'hold') {
+      if (activeSession) {
+        activeSession.hold();
+      }
+    }
+
+    // Handle Unhold Call (resume line)
+    if (msg.type === 'unhold') {
+      if (activeSession) {
+        activeSession.unhold();
+      }
+    }
+
     // Handle Human Audio Input chunk
     if (msg.type === 'audio_input') {
-      if (activeSession && activeSession.state === 'IN_CALL') {
+      if (activeSession && (activeSession.state === 'CONNECTED' || activeSession.state === 'IN_CALL')) {
         const audioBuffer = Buffer.from(msg.data, 'base64');
         activeSession.handleHumanAudio(audioBuffer);
       }
@@ -1009,7 +1281,7 @@ wss.on('connection', (ws) => {
 
     // Handle Human Text Input (barge-in / speak via text)
     if (msg.type === 'text_input') {
-      if (activeSession && activeSession.state === 'IN_CALL') {
+      if (activeSession && (activeSession.state === 'CONNECTED' || activeSession.state === 'IN_CALL')) {
         activeSession.handleHumanText(msg.text);
       }
     }
@@ -1022,7 +1294,12 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('close', () => {});
+  ws.on('close', () => {
+    if (duetSession) {
+      duetSession.destroy();
+      duetSession = null;
+    }
+  });
 });
 
 // Setup public file watchers

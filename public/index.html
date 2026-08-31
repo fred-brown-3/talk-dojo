@@ -98,10 +98,17 @@
         </div>
 
         <!-- 6. 🤖 Assistant -->
-        <button class="nav-item" data-tab="assistant" data-sub="edit" title="Configure Assistant">
-          <span class="nav-icon">🤖</span>
-          <span class="nav-label">Assistant</span>
-        </button>
+        <div class="nav-tree-group" id="nav-group-assistant">
+          <button class="nav-item nav-tree-header" data-tab="assistant" data-sub="persona" title="Virtual Assistant">
+            <span class="nav-icon">🤖</span>
+            <span class="nav-label">Assistant</span>
+            <span class="tree-arrow">▾</span>
+          </button>
+          <div class="nav-sub-tree">
+            <button class="nav-sub-item active" data-tab="assistant" data-sub="persona">Persona</button>
+            <button class="nav-sub-item" data-tab="assistant" data-sub="chat">Test Chat</button>
+          </div>
+        </div>
 
         <!-- 6. 🏆 Certification -->
         <div class="nav-tree-group" id="nav-group-certification">
@@ -629,6 +636,27 @@
                   </div>
                 </div>
 
+                <!-- Call Direction (Inbound vs Outbound) -->
+                <div class="form-group mb-3">
+                  <label class="text-xs font-bold block mb-1">Call Direction</label>
+                  <div class="direction-toggle-group" id="scenario-dir-toggle-group">
+                    <button type="button" id="scenario-dir-inbound" class="direction-btn active" data-dir="inbound">
+                      <span class="dir-icon">📞</span>
+                      <span class="dir-text-col">
+                        <span class="dir-title">Inbound Call</span>
+                        <span class="dir-hint">Customer calls in · Assistant greets first</span>
+                      </span>
+                    </button>
+                    <button type="button" id="scenario-dir-outbound" class="direction-btn" data-dir="outbound">
+                      <span class="dir-icon">📲</span>
+                      <span class="dir-text-col">
+                        <span class="dir-title">Outbound Call</span>
+                        <span class="dir-hint">Assistant calls out · Customer speaks first</span>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
                 <!-- Linked Policies & Procedures Card -->
                 <div class="card p-3 mb-3" style="background: rgba(255,255,255,0.02); border-color: var(--border-subtle);">
                   <div class="flex-between mb-2">
@@ -691,152 +719,265 @@
         <!-- TAB 6: 🤖 ASSISTANT (DIRECT EDIT + EMBEDDED CHAT)           -->
         <!-- ============================================================ -->
         <section id="pane-assistant" class="tab-pane">
-          <div class="pane-header">
-            <div>
-              <h2>🤖 Assistant</h2>
-              <p class="text-muted text-xs">Configure this account's phone persona, voice timbre, conversational style, and live testing behavior.</p>
+          <!-- ============================================================ -->
+          <!-- SUBVIEW 1: PERSONA & SETTINGS                                -->
+          <!-- ============================================================ -->
+          <div id="asst-subview-persona">
+            <div class="pane-header">
+              <div>
+                <h2>🤖 Assistant Persona</h2>
+                <p class="text-muted text-xs">Configure this account's phone persona, voice timbre, personality style, and backstory.</p>
+              </div>
             </div>
-          </div>
 
-          <!-- Guidance Callout Banner -->
-          <div class="guidance-banner">
-            <span class="guidance-icon">💡</span>
-            <div class="guidance-content">
-              <h4>Your Account Assistant</h4>
-              <p>Each account has exactly one assistant. Its persona and voice combine with the organization's <strong>Policies</strong> and <strong>Procedures</strong>. Click <strong>"🔊 Preview Voice (10s)"</strong> to hear its Gemini Live voice.</p>
+            <!-- Guidance Callout Banner -->
+            <div class="guidance-banner">
+              <span class="guidance-icon">💡</span>
+              <div class="guidance-content">
+                <h4>Your Account Assistant</h4>
+                <p>Each account has exactly one assistant. Its persona and voice combine with the organization's <strong>Policies</strong> and <strong>Procedures</strong>. Click <strong>"🔊 Preview Voice (10s)"</strong> to hear its Gemini Live voice.</p>
+              </div>
             </div>
-          </div>
 
-          <div id="assistant-editor-card" class="card">
-                <div class="flex-between mb-3 border-b pb-2">
-                  <div>
-                    <h3 id="editor-heading">Configure Virtual Assistant</h3>
-                    <span id="editor-subheading" class="text-xs text-muted">Edit persona, voice timbre, and tool access</span>
-                  </div>
-                  <div class="flex-center gap-2">
-                    <button id="btn-editor-save-asst" class="btn-primary-cyan">Save Assistant</button>
-                  </div>
+            <div id="assistant-editor-card" class="card">
+              <div class="flex-between mb-3 border-b pb-2">
+                <div>
+                  <h3 id="editor-heading">Configure Virtual Assistant</h3>
+                  <span id="editor-subheading" class="text-xs text-muted">Edit persona, voice timbre, and authentic backstory</span>
                 </div>
+                <div class="flex-center gap-2">
+                  <button id="btn-editor-save-asst" class="btn-primary-cyan">Save Assistant</button>
+                </div>
+              </div>
 
-                <!-- AI helper for quickly refining the single assistant persona -->
-                <div id="editor-ai-creator-box" class="card card-ai-prompt mb-3">
-                  <span class="text-xs text-cyan font-bold block mb-2">✨ Refine This Assistant's Persona</span>
+              <!-- Collapsible AI helper for refining persona -->
+              <div class="collapsible-card mb-3" id="asst-ai-refine-collapsible">
+                <button type="button" id="btn-toggle-ai-refine" class="collapsible-header">
+                  <span class="flex-center gap-2">
+                    <span class="text-cyan font-bold">✨ Refine Persona with AI</span>
+                    <span class="badge-mini text-muted">First-time setup or style tweaks</span>
+                  </span>
+                  <span id="ai-refine-chevron" class="collapsible-chevron">▾</span>
+                </button>
+                <div id="editor-ai-creator-box" class="collapsible-body hidden">
                   <div class="flex-gap-2">
                     <input type="text" id="editor-describe-asst-input" class="input-soft flex-1" placeholder="e.g. Make the assistant warm, patient with seniors, and calm under pressure...">
                     <button id="btn-ai-generate-asst" class="btn-primary-cyan">✨ Refine Persona</button>
                   </div>
                 </div>
+              </div>
 
-                <div class="form-grid-2">
-                  <div class="form-group">
-                    <label for="asst-name-input">Assistant Name</label>
-                    <input type="text" id="asst-name-input" class="input-soft" placeholder="e.g. Sarah Lou Jenkins">
-                  </div>
-
-                  <!-- Voice Model Selection with Timbre Clarity & 10s Audio Preview -->
-                  <div class="form-group">
-                    <div class="flex-between mb-1">
-                      <label for="asst-voice-select">Voice Model & Timbre</label>
-                      <button id="btn-preview-voice" class="btn-soft-xs text-cyan" title="Listen to 10-second spoken preview">
-                        🔊 Preview Voice (10s)
-                      </button>
-                    </div>
-                    <select id="asst-voice-select" class="select-soft">
-                      <option value="Aoede">Aoede (Female timbre · Warm, breezy & natural)</option>
-                      <option value="Fenrir">Fenrir (Male timbre · Deep, resonant & authoritative)</option>
-                      <option value="Charon">Charon (Male timbre · Calm, clinical & measured)</option>
-                      <option value="Kore">Kore (Female timbre · Bright, cheerful & energetic)</option>
-                      <option value="Puck">Puck (Male/Neutral timbre · Casual, friendly & conversational)</option>
-                    </select>
-                    <audio id="voice-preview-audio" class="hidden" preload="none"></audio>
-                  </div>
-                </div>
-
+              <div class="form-grid-2">
                 <div class="form-group">
-                  <label for="asst-personality-input">Personality Style</label>
-                  <input type="text" id="asst-personality-input" class="input-soft" placeholder="e.g. Southern Charm & Warmth, polite, patient">
+                  <label for="asst-name-input">Assistant Name</label>
+                  <input type="text" id="asst-name-input" class="input-soft" placeholder="e.g. Sarah Lou Jenkins">
                 </div>
 
+                <!-- Voice Model Selection with Timbre Clarity & 10s Audio Preview -->
                 <div class="form-group">
-                  <label for="asst-backstory-input">Backstory & Authentic Context</label>
-                  <textarea id="asst-backstory-input" class="textarea-soft auto-grow" rows="3" placeholder="Describe the assistant's background and authentic context..."></textarea>
-                </div>
-
-                <div class="form-group">
-                  <div class="flex-between mb-2">
-                    <label><strong>Conversational Guidelines & Manners</strong></label>
-                    <button id="btn-asst-add-rule" class="btn-soft-xs">+ Add Guideline</button>
-                  </div>
-                  <div id="asst-rules-list" class="policies-list"></div>
-                </div>
-
-                <!-- ============================================================ -->
-                <!-- EMBEDDED CHAT WITH ASSISTANT (WINDOW INSIDE WINDOW)          -->
-                <!-- ============================================================ -->
-                <div class="embedded-chat-container mt-4 pt-3 border-t">
-                  <div class="flex-between mb-2">
-                    <div class="flex-center gap-2">
-                      <span>💬</span>
-                      <strong>Test This Assistant in Live Call / Chat</strong>
-                    </div>
-                    <button id="btn-review-chat-interaction" class="btn-outline-amber text-xs">
-                      🔍 Review Interaction & Scan for Improvements
+                  <div class="flex-between mb-1">
+                    <label for="asst-voice-select">Voice Model & Timbre</label>
+                    <button id="btn-preview-voice" class="btn-soft-xs text-cyan" title="Listen to 10-second spoken preview">
+                      🔊 Preview Voice (10s)
                     </button>
                   </div>
-
-                  <div class="embedded-chat-controls mb-2">
-                    <div class="form-grid-3">
-                      <div class="form-group mb-1">
-                        <label class="text-xs">Scenario Mode</label>
-                        <select id="chat-target-mode" class="select-soft">
-                          <option value="freeform">Freeform Sandbox</option>
-                          <option value="scenario">Bank Test Scenario</option>
-                          <option value="pasted">Custom Pasted Scenario</option>
-                        </select>
-                      </div>
-
-                      <div class="form-group mb-1" id="chat-scenario-select-box">
-                        <label class="text-xs">Select Bank Scenario</label>
-                        <select id="chat-scenario-select" class="select-soft"></select>
-                      </div>
-
-                      <div class="form-group mb-1">
-                        <label class="text-xs">Modality</label>
-                        <div class="mode-switch">
-                          <button class="mode-btn active" id="chat-modality-text" data-mod="text">Text ⚡</button>
-                          <button class="mode-btn" id="chat-modality-voice" data-mod="voice">Voice 🎙️</button>
-                          <button class="mode-btn" id="chat-modality-hybrid" data-mod="hybrid">Hybrid 🔀</button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div id="chat-pasted-scenario-box" class="form-group mb-1 hidden">
-                      <label class="text-xs">Paste Scenario / Caller Objective</label>
-                      <textarea id="chat-pasted-input" class="textarea-soft auto-grow" rows="2" placeholder="e.g. Caller is an anxious patient asking about lab test results..."></textarea>
-                    </div>
-
-                    <div class="flex-between mt-2">
-                      <button id="btn-begin-chat" class="btn-primary-cyan">
-                        ▶ Begin Call / Chat
-                      </button>
-                      <button id="btn-reset-chat" class="btn-soft-xs">Reset Chat</button>
-                    </div>
-                  </div>
-
-                  <!-- Chat Feed Window -->
-                  <div class="embedded-chat-window">
-                    <div id="chat-pre-call-banner" class="pre-call-banner">
-                      <span class="text-xs text-muted">Click <strong>"▶ Begin Call / Chat"</strong> to start speaking with this assistant.</span>
-                    </div>
-                    <div id="chat-sparring-feed" class="chat-sparring-feed hidden"></div>
-                    <div id="chat-input-row-box" class="chat-input-bar hidden">
-                      <input type="text" id="chat-user-input" class="input-soft flex-1" placeholder="Speak or type your turn...">
-                      <button id="btn-send-chat" class="btn-primary-cyan">Send</button>
-                    </div>
-                  </div>
-                  <!-- Hidden audio player for assistant speech output -->
-                  <audio id="chat-audio-player" class="hidden"></audio>
+                  <select id="asst-voice-select" class="select-soft">
+                    <option value="Aoede">Aoede (Female timbre · Warm, breezy & natural)</option>
+                    <option value="Fenrir">Fenrir (Male timbre · Deep, resonant & authoritative)</option>
+                    <option value="Charon">Charon (Male timbre · Calm, clinical & measured)</option>
+                    <option value="Kore">Kore (Female timbre · Bright, cheerful & energetic)</option>
+                    <option value="Puck">Puck (Male/Neutral timbre · Casual, friendly & conversational)</option>
+                  </select>
+                  <audio id="voice-preview-audio" class="hidden" preload="none"></audio>
                 </div>
+              </div>
+
+              <div class="form-group">
+                <label for="asst-speaking-style-input">Speaking Style</label>
+                <textarea id="asst-speaking-style-input" class="textarea-soft auto-grow" rows="3" placeholder="e.g. Calm, professional, matter-of-fact routine receptionist tone. Never overly cheerful or eager."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="asst-listening-style-input">Listening Style</label>
+                <textarea id="asst-listening-style-input" class="textarea-soft auto-grow" rows="3" placeholder="e.g. dynamic - occasional verbal confirmation that the agent is listening while the user continues to speak - hmmm, ok, I see."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="asst-backstory-input">Backstory & Authentic Context</label>
+                <textarea id="asst-backstory-input" class="textarea-soft auto-grow" rows="4" placeholder="Describe the assistant's background and authentic context..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================================ -->
+          <!-- SUBVIEW 2: DEDICATED TEST CHAT & DUPLEX VOICE SPARRING      -->
+          <!-- ============================================================ -->
+          <div id="asst-subview-chat" class="hidden">
+            <div class="pane-header">
+              <div>
+                <h2>💬 Assistant Test Chat & Sparring</h2>
+                <p class="text-muted text-xs">Spar directly with your assistant using live duplex browser audio (mic & speakers).</p>
+              </div>
+            </div>
+
+            <div class="test-chat-grid">
+              <!-- LEFT PANEL: Scenario Setup -->
+              <div class="card scenario-setup-panel">
+                <div class="flex-between mb-3 border-b pb-2">
+                  <h4 class="font-bold text-sm">Scenario Setup</h4>
+                  <span id="chat-scenario-badge" class="badge-mini">Custom</span>
+                </div>
+
+                <!-- Scenario Selector -->
+                <div class="form-group mb-3">
+                  <label for="chat-scenario-picker" class="text-xs font-bold block mb-1">Choose Starting Scenario</label>
+                  <select id="chat-scenario-picker" class="select-soft">
+                    <option value="custom">-- Custom / Freeform Scenario --</option>
+                  </select>
+                </div>
+
+                <!-- Call Direction -->
+                <div class="form-group mb-3">
+                  <label class="text-xs font-bold block mb-1">Call Direction</label>
+                  <div class="direction-toggle-group" id="chat-dir-toggle-group">
+                    <button type="button" id="chat-dir-inbound" class="direction-btn active" data-dir="inbound">
+                      <span class="dir-icon">📞</span>
+                      <span class="dir-text-col">
+                        <span class="dir-title">Inbound Call</span>
+                        <span class="dir-hint">Customer calls in · Assistant greets first</span>
+                      </span>
+                    </button>
+                    <button type="button" id="chat-dir-outbound" class="direction-btn" data-dir="outbound">
+                      <span class="dir-icon">📲</span>
+                      <span class="dir-text-col">
+                        <span class="dir-title">Outbound Call</span>
+                        <span class="dir-hint">Assistant calls out · Customer speaks first</span>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Scenario Title (for saving) -->
+                <div class="form-group mb-3">
+                  <label for="chat-scenario-title" class="text-xs font-bold block mb-1">Scenario Title</label>
+                  <input type="text" id="chat-scenario-title" class="input-soft" placeholder="e.g. Inquire about pricing and schedule checkup">
+                </div>
+
+                <!-- Customer Persona / Role -->
+                <div class="form-group mb-3">
+                  <label for="chat-customer-role" class="text-xs font-bold block mb-1">Customer Persona / Role</label>
+                  <input type="text" id="chat-customer-role" class="input-soft" placeholder="e.g. Patient John Smith">
+                </div>
+
+                <!-- Scenario Objective & Secret Caller Instructions -->
+                <div class="form-group mb-3">
+                  <label for="chat-instructions" class="text-xs font-bold block mb-1">Scenario Objective & Secret Caller Instructions</label>
+                  <textarea id="chat-instructions" class="textarea-soft auto-grow" rows="4" placeholder="e.g. You are John Smith, DOB March 14, 1980. You want to schedule an appointment for Thursday afternoon..."></textarea>
+                </div>
+
+                <!-- Scenario Save / Update Actions -->
+                <div class="flex-col gap-2 pt-2 border-t mt-3">
+                  <button type="button" id="btn-chat-update-scenario" class="btn-secondary text-xs w-full hidden">
+                    💾 Update Scenario (<span id="chat-update-scenario-id">TEST-xxx</span>)
+                  </button>
+                  <button type="button" id="btn-chat-save-new-scenario" class="btn-outline-cyan text-xs w-full">
+                    ➕ Save as New Test Scenario...
+                  </button>
+                </div>
+              </div>
+
+              <!-- RIGHT PANEL: Smartphone Glass Screen Live Call Console -->
+              <div class="card live-call-panel phone-chassis flex-col">
+                <!-- Phone Screen Header (Status & Avatar) -->
+                <div class="phone-screen-header">
+                  <div class="phone-avatar-col">
+                    <div class="phone-avatar-circle">
+                      <span class="phone-avatar-icon">🤖</span>
+                    </div>
+                    <div class="phone-identity">
+                      <strong id="call-assistant-label" class="phone-name">Assistant</strong>
+                      <div class="phone-status-row">
+                        <span id="call-status-indicator" class="status-light status-light-gray"></span>
+                        <span id="call-status-label" class="phone-status-text">Ready to Call</span>
+                        <span id="call-timer-box" class="call-timer hidden">00:00</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="phone-top-actions">
+                    <button type="button" id="btn-review-interaction" class="btn-outline-amber text-xs hidden" title="Review with AI Referee">
+                      🔍 Review
+                    </button>
+                    <button type="button" id="btn-reset-call" class="btn-icon-phone" title="New Call / Reset">
+                      🔄
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Audio Visualizer Waves -->
+                <div id="call-audio-visualizer-box" class="audio-visualizer-container mb-2">
+                  <div class="audio-wave-bars">
+                    <span class="wave-bar"></span>
+                    <span class="wave-bar"></span>
+                    <span class="wave-bar"></span>
+                    <span class="wave-bar"></span>
+                    <span class="wave-bar"></span>
+                    <span class="wave-bar"></span>
+                    <span class="wave-bar"></span>
+                    <span class="wave-bar"></span>
+                  </div>
+                  <div id="call-activity-text" class="text-xs text-dim mt-1">Live voice channel ready</div>
+                </div>
+
+                <!-- Phone Tactile Action Buttons Row -->
+                <div class="phone-keypad-row mb-3">
+                  <!-- Start Call Button -->
+                  <button type="button" id="btn-start-call" class="phone-btn phone-btn-call" title="Start Call">
+                    <span class="phone-btn-icon">📞</span>
+                    <span class="phone-btn-label">Call</span>
+                  </button>
+
+                  <!-- Mute Button (In-Call) -->
+                  <button type="button" id="btn-mute-mic" class="phone-btn phone-btn-mute hidden" title="Mute Microphone">
+                    <span class="phone-btn-icon">🎤</span>
+                    <span class="phone-btn-label">Mute</span>
+                  </button>
+
+                  <!-- Hold Button (In-Call) -->
+                  <button type="button" id="btn-hold-call" class="phone-btn phone-btn-hold hidden" title="Hold / Pause Call">
+                    <span class="phone-btn-icon">⏸️</span>
+                    <span class="phone-btn-label">Hold</span>
+                  </button>
+
+                  <!-- End Call Button (In-Call) -->
+                  <button type="button" id="btn-end-call" class="phone-btn phone-btn-end hidden" title="End Call">
+                    <span class="phone-btn-icon">🛑</span>
+                    <span class="phone-btn-label">End</span>
+                  </button>
+
+                  <!-- Clear / New Call Button -->
+                  <button type="button" id="btn-clear-chat-history" class="phone-btn phone-btn-reset" title="Clear History">
+                    <span class="phone-btn-icon">🗑️</span>
+                    <span class="phone-btn-label">Clear</span>
+                  </button>
+                </div>
+
+                <!-- Live Transcript Feed -->
+                <div id="chat-live-transcript" class="chat-sparring-feed flex-1">
+                  <div class="text-center py-4 text-dim text-xs">
+                    Tap <strong>"📞 Call"</strong> to begin a live spoken conversation with the assistant over your microphone and speakers.
+                  </div>
+                </div>
+
+                <!-- Text Fallback Input Bar -->
+                <div class="chat-input-bar mt-2">
+                  <input type="text" id="chat-text-fallback-input" class="input-soft flex-1" placeholder="Type a message or speak into your microphone...">
+                  <button type="button" id="btn-send-text-fallback" class="btn-send-cyan">
+                    <span>Send</span>
+                    <span class="send-arrow">➤</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1085,6 +1226,68 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js"></script>
+  <!-- ============================================================ -->
+  <!-- MODAL: CALL REVIEW & AUDIO RECORDING PLAYER                  -->
+  <!-- ============================================================ -->
+  <div id="modal-call-review" class="modal hidden">
+    <div class="modal-content modal-call-review-content card">
+      <div class="modal-header border-b pb-3 flex-between">
+        <div class="flex-center gap-2">
+          <span class="text-xl">🎙️</span>
+          <div>
+            <h3 class="font-bold text-base">Call Review & Audio Recording</h3>
+            <div class="flex-center gap-3 text-xs text-muted mt-1">
+              <span id="review-call-scenario-title">Scenario Sparring Session</span>
+              <span>·</span>
+              <span id="review-call-duration">Duration: 00:00</span>
+              <span>·</span>
+              <span id="review-call-date">Just now</span>
+            </div>
+          </div>
+        </div>
+        <button id="btn-close-call-review" class="btn-icon-soft" title="Close Review">✕</button>
+      </div>
+
+      <div class="modal-body py-4 flex-col gap-4">
+        <!-- Audio Recording Player Card -->
+        <div class="call-recording-player-card">
+          <div class="flex-between mb-2">
+            <span class="text-xs font-bold text-cyan">🔊 Full Call Audio Recording</span>
+            <span id="review-recording-filename" class="text-xs text-dim">recording.wav</span>
+          </div>
+          <audio id="review-audio-player" class="w-full custom-audio-player" controls preload="auto"></audio>
+        </div>
+
+        <!-- AI Referee Scorecard -->
+        <div class="review-referee-card">
+          <div class="flex-between border-b pb-2 mb-3">
+            <div class="flex-center gap-2">
+              <span class="text-base">⚖️</span>
+              <h4 class="font-bold text-sm">AI Referee Evaluation</h4>
+            </div>
+            <div id="review-score-pill" class="badge-score-pill">Score: --</div>
+          </div>
+          <p id="review-eval-summary" class="text-xs text-muted mb-3">Evaluating conversation adherence...</p>
+          <div class="review-coaching-box">
+            <strong class="text-xs text-amber block mb-1">💡 Coaching Feedback & Action Items:</strong>
+            <ul id="review-coaching-list" class="review-coaching-list text-xs text-dim"></ul>
+          </div>
+        </div>
+
+        <!-- Verbatim Transcript Turns -->
+        <div class="review-transcript-card">
+          <h4 class="font-bold text-xs mb-2 text-muted uppercase">Verbatim Call Transcript</h4>
+          <div id="review-transcript-turns" class="review-transcript-container"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-t pt-3 flex-between">
+        <button id="btn-review-close-footer" class="btn-secondary text-xs">Close</button>
+        <button id="btn-review-export-report" class="btn-outline-cyan text-xs">📥 Export Run Report</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js?v=3"></script>
 </body>
 </html>

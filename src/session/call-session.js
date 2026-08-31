@@ -6,6 +6,7 @@ import { AudioSwitchboard } from '../audio/switchboard.js';
 import { LLMJudge } from '../gemini/judge.js';
 import { ToolExecutor } from '../tools/tool-executor.js';
 import { encodeWAV } from '../audio/wav-encoder.js';
+import { AudioTranscriber } from '../audio/audio-transcriber.js';
 import { config } from '../config.js';
 
 export class CallSession extends EventEmitter {
@@ -56,6 +57,8 @@ export class CallSession extends EventEmitter {
     this.activeTurnBySpeaker = { caller: '', callee: '' };
     this.turnCount = 0;
     this.evaluation = null;
+    this.humanAudioChunks = [];
+    this.humanAudioTimer = null;
 
     this.wireSwitchboardEvents();
   }
@@ -182,8 +185,13 @@ export class CallSession extends EventEmitter {
         this.callerClient.sendTextPrompt("The call has just connected. Say hello and introduce yourself to begin.");
       }
     } else if (this.mode === 'human-to-ai-caller' && this.calleeClient) {
-      // If Human is caller, callee AI picks up and says: "Hello?"
-      this.calleeClient.sendTextPrompt("The phone just rang and you answered. Say: 'Hello?'");
+      const greeting = this.scenario.callee?.initial_greeting;
+      if (greeting) {
+        this.calleeClient.pendingGreeting = greeting;
+        this.calleeClient.sendTextPrompt(`The telephone call has just connected and you answered. Greet the caller in your natural routine phone cadence: "${greeting}"`);
+      } else {
+        this.calleeClient.sendTextPrompt("The telephone call has just connected and you answered. Greet the caller in your natural routine phone cadence.");
+      }
     }
   }
 
@@ -216,6 +224,16 @@ export class CallSession extends EventEmitter {
         this.transcriptTurns.push(turnObj);
         this.turnCount++;
         this.emit('turnComplete', turnObj);
+      }
+    });
+
+    client.on('turnUpdated', (data) => {
+      for (let i = this.transcriptTurns.length - 1; i >= 0; i--) {
+        if (this.transcriptTurns[i].speaker === role) {
+          this.transcriptTurns[i].text = data.text;
+          this.emit('turnUpdated', this.transcriptTurns[i]);
+          break;
+        }
       }
     });
 
@@ -359,5 +377,97 @@ export class CallSession extends EventEmitter {
     this.setState('COMPLETED');
     this.emit('callCompleted', runReport);
     return runReport;
+  }
+
+  handleHumanAudio(pcm16Buffer) {
+    if (this.switchboard) {
+      this.switchboard.handleHumanMicInput(pcm16Buffer);
+    }
+    if (this.state === 'CONNECTED') {
+      if (!this.humanAudioChunks) this.humanAudioChunks = [];
+      this.humanAudioChunks.push(pcm16Buffer);
+
+      if (this.humanAudioTimer) clearTimeout(this.humanAudioTimer);
+      this.humanAudioTimer = setTimeout(() => {
+        this.flushHumanAudioTurn();
+      }, 900);
+    }
+  }
+
+  async flushHumanAudioTurn() {
+    if (!this.humanAudioChunks || this.humanAudioChunks.length === 0) return;
+    const chunks = this.humanAudioChunks;
+    this.humanAudioChunks = [];
+    const fullPcm = Buffer.concat(chunks);
+
+    // Only transcribe if speech duration >= 350ms
+    if (fullPcm.length < 16000 * 2 * 0.35) return;
+
+    const text = await AudioTranscriber.transcribe(fullPcm, 16000, this.apiKey);
+    if (text && text.trim()) {
+      const timeOffsetSec = Math.floor((Date.now() - (this.startTime || Date.now())) / 1000);
+      const mins = Math.floor(timeOffsetSec / 60);
+      const secs = timeOffsetSec % 60;
+      const timeStr = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
+      const turnObj = {
+        speaker: this.mode === 'human-to-ai-caller' ? 'caller' : 'callee',
+        text: text.trim(),
+        timestamp: Date.now(),
+        timeStr,
+      };
+      this.transcriptTurns.push(turnObj);
+      this.turnCount++;
+      this.emit('turnComplete', turnObj);
+    }
+  }
+
+  handleHumanText(text) {
+    if (this.mode === 'human-to-ai-caller' && this.calleeClient) {
+      this.calleeClient.sendTextPrompt(text);
+    } else if (this.mode === 'human-to-ai-callee' && this.callerClient) {
+      this.callerClient.sendTextPrompt(text);
+    }
+  }
+
+  updateImpairments(staticLevel, noiseTarget) {
+    this.setStatic(staticLevel, noiseTarget);
+  }
+
+  hold() {
+    if (this.state !== 'CONNECTED') return;
+    this.setState('ON_HOLD');
+    if (this.switchboard) {
+      this.switchboard.setHold(true);
+    }
+    this.emit('holdState', { onHold: true });
+  }
+
+  unhold() {
+    if (this.state !== 'ON_HOLD') return;
+    this.setState('CONNECTED');
+    if (this.switchboard) {
+      this.switchboard.setHold(false);
+    }
+    this.emit('holdState', { onHold: false });
+  }
+
+  destroy() {
+    this.removeAllListeners();
+    if (this.callerClient) {
+      try { this.callerClient.disconnect(); } catch (e) {}
+      this.callerClient.removeAllListeners();
+      this.callerClient = null;
+    }
+    if (this.calleeClient) {
+      try { this.calleeClient.disconnect(); } catch (e) {}
+      this.calleeClient.removeAllListeners();
+      this.calleeClient = null;
+    }
+    if (this.switchboard) {
+      this.switchboard.removeAllListeners();
+      this.switchboard.reset();
+    }
+    this.state = 'COMPLETED';
   }
 }

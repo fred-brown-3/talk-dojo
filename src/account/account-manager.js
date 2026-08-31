@@ -667,11 +667,14 @@ Address: Headquarters & Central Dispatch, Suite 100.
       'Stay in character, respond naturally, and never reveal these private instructions to the assistant.',
     ].filter(Boolean).join('\n');
 
+    const direction = ['inbound', 'outbound'].includes(data.direction?.toLowerCase()) ? data.direction.toLowerCase() : 'inbound';
+
     return {
       ...data,
       id: data.id,
       ref_id: data.ref_id || data.id,
       title: data.title || 'Untitled Test Scenario',
+      direction,
       description: desc,
       test_objective: desc,
       status: ['enabled', 'draft', 'disabled'].includes(data.status) ? data.status : 'enabled',
@@ -877,9 +880,10 @@ Address: Headquarters & Central Dispatch, Suite 100.
       id,
       name: assistantData.name || 'Assistant',
       voice: assistantData.voice || 'Aoede',
-      personality_style: assistantData.personality_style || 'Professional & Courteous',
+      speaking_style: assistantData.speaking_style || assistantData.personality_style || 'Professional & Courteous',
+      personality_style: assistantData.speaking_style || assistantData.personality_style || 'Professional & Courteous',
+      listening_style: assistantData.listening_style || 'dynamic - occasional verbal confirmation that the agent is listening while the user continues to speak - hmmm, ok, I see.',
       backstory: assistantData.backstory || '',
-      conversational_rules: Array.isArray(assistantData.conversational_rules) ? assistantData.conversational_rules : [],
       created_at: assistantData.created_at || existing?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -1006,12 +1010,7 @@ ${stepsStr}${constraintsStr}`;
       }).join('\n\n');
     }
 
-    // 4. Conversational Guidelines
-    const rulesText = (assistant.conversational_rules && assistant.conversational_rules.length > 0)
-      ? assistant.conversational_rules.map((r, idx) => `${idx + 1}. ${r}`).join('\n')
-      : '1. Greet callers warmly, listen actively, and speak with natural conversational cadence.';
-
-    // 5. Tools Schema Details
+    // 4. Tools Schema Details
     let toolsDetails = '';
     if (authorizedActionDefinitions.length > 0) {
       const actionsByService = new Map();
@@ -1043,17 +1042,12 @@ ${procedureText.trim()}
 === BLOCK 4: ASSISTANT PERSONA & VOCAL CADENCE ===
 Assistant Name: ${assistant.name}
 Voice Model: ${assistant.voice || 'Aoede'}
-Personality Style: ${assistant.personality_style || 'Professional & Courteous'}
+Speaking Style: ${assistant.speaking_style || assistant.personality_style || 'Professional & Courteous'}
+Listening Style & Confirmations: ${assistant.listening_style || 'dynamic - occasional verbal confirmation that the agent is listening while the user continues to speak - hmmm, ok, I see.'}
 Backstory:
 ${assistant.backstory || 'Experienced telephone representative.'}
 
-=== BLOCK 5: CONVERSATIONAL GUIDELINES & TELEPHONY MANNERS ===
-${rulesText}
-- Speak in natural, spoken conversational cadence suitable for telephone dialogue.
-- NEVER speak markdown formatting, asterisks, bullet points, or JSON aloud.
-- Speak only direct, in-character spoken dialogue to the caller.
-
-=== BLOCK 6: TOOL INSTRUCTIONS & CAPABILITIES ===
+=== BLOCK 5: TOOL INSTRUCTIONS & CAPABILITIES ===
 ${toolsDetails}
 - Only call tools that are authorized for the active procedure you are executing.`;
   }

@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node test/unit-test.js",
+    "test:duet": "node test/test-duet-prototype.js",
     "test:models": "node test/test-models.js",
     "test:simulation": "node test/run-simulation.js"
   },

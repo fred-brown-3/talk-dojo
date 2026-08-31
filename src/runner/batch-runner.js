@@ -264,32 +264,48 @@ export class BatchRunner extends EventEmitter {
     const toolLogs = [];
     const startTime = Date.now();
 
-    // Kickoff turn: Assistant greets
-    let assistantGreeting = test.caller?.initial_greeting || `Hello, this is ${assistant.name} calling.`;
-    transcript.push({
-      speaker: 'caller',
-      text: assistantGreeting,
-      timeStr: '0:02',
-      timestamp: Date.now(),
-    });
-
-    this.emit('turn_update', {
-      testId: test.id,
-      turn: transcript[0],
-    });
-
-    // Callee responds with initial greeting if present
-    if (test.callee?.initial_greeting) {
+    // Kickoff turn based on call direction
+    const isOutbound = test.direction === 'outbound';
+    if (isOutbound) {
+      // Outbound call: Assistant called customer, customer answers and speaks first
+      const customerGreeting = test.callee?.initial_greeting || 'Hello?';
       transcript.push({
         speaker: 'callee',
-        text: test.callee.initial_greeting,
-        timeStr: '0:05',
+        text: customerGreeting,
+        timeStr: '0:02',
         timestamp: Date.now(),
       });
       this.emit('turn_update', {
         testId: test.id,
-        turn: transcript[1],
+        turn: transcript[0],
       });
+    } else {
+      // Inbound call: Customer calls into business, assistant greets first
+      const assistantGreeting = test.caller?.initial_greeting || `Hello! Thank you for calling. This is ${assistant.name}. How can I help you today?`;
+      transcript.push({
+        speaker: 'caller',
+        text: assistantGreeting,
+        timeStr: '0:02',
+        timestamp: Date.now(),
+      });
+      this.emit('turn_update', {
+        testId: test.id,
+        turn: transcript[0],
+      });
+
+      // Callee responds with initial greeting if present
+      if (test.callee?.initial_greeting) {
+        transcript.push({
+          speaker: 'callee',
+          text: test.callee.initial_greeting,
+          timeStr: '0:05',
+          timestamp: Date.now(),
+        });
+        this.emit('turn_update', {
+          testId: test.id,
+          turn: transcript[1],
+        });
+      }
     }
 
     // Sparring turn loop

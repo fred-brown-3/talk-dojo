@@ -18,6 +18,7 @@ export class AudioManager {
     // Optional browser speech recognition for human turns
     this.recognition = null;
     this.onHumanTranscript = null;
+    this.activeSources = [];
   }
 
   async ensureAudioContext() {
@@ -50,13 +51,38 @@ export class AudioManager {
     source.buffer = audioBuffer;
     source.connect(this.audioCtx.destination);
 
+    this.activeSources.push(source);
+    source.onended = () => {
+      const idx = this.activeSources.indexOf(source);
+      if (idx !== -1) this.activeSources.splice(idx, 1);
+    };
+
     const currentTime = this.audioCtx.currentTime;
+    // If playhead has fallen behind (idle or buffer underrun), catch up with a 20ms lead
     if (this.nextPlayTime < currentTime) {
-      this.nextPlayTime = currentTime;
+      this.nextPlayTime = currentTime + 0.02;
     }
 
     source.start(this.nextPlayTime);
     this.nextPlayTime += audioBuffer.duration;
+  }
+
+  /**
+   * Immediately stops any playing or queued assistant audio buffers
+   */
+  stopPlayback() {
+    if (this.activeSources) {
+      for (const s of this.activeSources) {
+        try {
+          s.stop();
+          s.disconnect();
+        } catch (e) {}
+      }
+      this.activeSources = [];
+    }
+    if (this.audioCtx) {
+      this.nextPlayTime = this.audioCtx.currentTime;
+    }
   }
 
   /**
@@ -73,7 +99,7 @@ export class AudioManager {
           channelCount: 1,
           sampleRate: this.sampleRateIn,
           echoCancellation: true,
-          noiseSuppression: false,
+          noiseSuppression: true,
           autoGainControl: true,
         },
       });
@@ -87,12 +113,24 @@ export class AudioManager {
       this.micProcessor.onaudioprocess = (e) => {
         if (!this.isMicActive) return;
         const inputData = e.inputBuffer.getChannelData(0);
+        const inRate = e.inputBuffer.sampleRate || (this.audioCtx ? this.audioCtx.sampleRate : 16000);
 
-        // Convert to Int16
-        const pcm16 = new Int16Array(inputData.length);
-        for (let i = 0; i < inputData.length; i++) {
-          const s = Math.max(-1, Math.min(1, inputData[i]));
-          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        let pcm16;
+        if (inRate === 16000) {
+          pcm16 = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
+        } else {
+          const ratio = inRate / 16000;
+          const outLength = Math.round(inputData.length / ratio);
+          pcm16 = new Int16Array(outLength);
+          for (let i = 0; i < outLength; i++) {
+            const idx = Math.floor(i * ratio);
+            const s = Math.max(-1, Math.min(1, inputData[idx] || 0));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
         }
 
         if (this.onMicAudioChunk) {

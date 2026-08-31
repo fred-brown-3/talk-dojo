@@ -246,13 +246,14 @@ async function runTests() {
   assert(compiledPrompt.includes('=== BLOCK 2: IMMUTABLE POLICIES & COMPLIANCE RULES ==='), 'Expected Block 2');
   assert(compiledPrompt.includes('=== BLOCK 3: AUTHORIZED PROCEDURES & WORKFLOW CONSTRAINTS ==='), 'Expected Block 3');
   assert(compiledPrompt.includes('=== BLOCK 4: ASSISTANT PERSONA & VOCAL CADENCE ==='), 'Expected Block 4');
-  assert(compiledPrompt.includes('=== BLOCK 5: CONVERSATIONAL GUIDELINES & TELEPHONY MANNERS ==='), 'Expected Block 5');
-  assert(compiledPrompt.includes('=== BLOCK 6: TOOL INSTRUCTIONS & CAPABILITIES ==='), 'Expected Block 6');
+  assert(compiledPrompt.includes('=== BLOCK 5: TOOL INSTRUCTIONS & CAPABILITIES ==='), 'Expected Block 5');
+  assert(!compiledPrompt.includes('=== BLOCK 5: CONVERSATIONAL GUIDELINES & TELEPHONY MANNERS ==='), 'Block 5 conversational guidelines should be removed');
+  assert(!compiledPrompt.includes('=== BLOCK 6:'), 'Prompt should only have 5 blocks');
   assert(compiledPrompt.includes('[POL-001]'), 'Expected prompt to reference POL-001');
   assert(compiledPrompt.includes('CRITICAL EXECUTION MANDATE:'), 'Expected execution mandate');
   assert(compiledPrompt.includes('MUST politely decline'), 'Expected polite decline mandate');
   assert(compiledPrompt.includes('Authorized Actions:'), 'Expected granular authorized actions in prompt');
-  console.log('   Strict 6-Block Prompt Compilation Confirmed');
+  console.log('   Strict 5-Block Prompt Compilation Confirmed');
 
   // Test Soft-Delete to Recycle Bin & Restore
   await testAccountManager.deletePolicy(accountId, policy3.id);
@@ -295,6 +296,7 @@ async function runTests() {
     linked_procedures: enabledProcedures.map(p => p.ref_id),
     evaluation_checklist: [{ id: 'coverage', goal: 'Follow all linked requirements', required: true }],
   });
+  assert.strictEqual(coveringTest.direction, 'inbound', 'Default scenario direction must be inbound');
   const gapsAfterCoverage = await testAccountManager.getCoverageGaps(accountId);
   assert.strictEqual(gapsAfterCoverage.total_gaps, 0, 'Expected complete enabled-item coverage');
 

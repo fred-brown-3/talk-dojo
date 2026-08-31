@@ -20,8 +20,13 @@ export class AudioSwitchboard extends EventEmitter {
     this.callerClient = null;
     this.calleeClient = null;
 
-    // Active state
+    // Active & Hold state
     this.isActive = false;
+    this.isOnHold = false;
+  }
+
+  setHold(onHold) {
+    this.isOnHold = !!onHold;
   }
 
   /**
@@ -90,7 +95,7 @@ export class AudioSwitchboard extends EventEmitter {
    * Caller is speaking (Output 24kHz from Caller -> to Callee input 16kHz)
    */
   handleCallerAudioOut(buffer24k, sampleRate = 24000) {
-    if (!this.isActive) return;
+    if (!this.isActive || this.isOnHold) return;
 
     // Downsample from 24kHz to 16kHz for receiver
     let pcm16k = AudioResampler.downsample24kTo16k(buffer24k);
@@ -118,7 +123,7 @@ export class AudioSwitchboard extends EventEmitter {
    * Callee is speaking (Output 24kHz from Callee -> to Caller input 16kHz)
    */
   handleCalleeAudioOut(buffer24k, sampleRate = 24000) {
-    if (!this.isActive) return;
+    if (!this.isActive || this.isOnHold) return;
 
     // Downsample from 24kHz to 16kHz for receiver
     let pcm16k = AudioResampler.downsample24kTo16k(buffer24k);
@@ -146,7 +151,7 @@ export class AudioSwitchboard extends EventEmitter {
    * Process incoming microphone audio from human user (16kHz PCM16)
    */
   handleHumanMicInput(pcm16k) {
-    if (!this.isActive) return;
+    if (!this.isActive || this.isOnHold) return;
 
     // Apply impairments if human side is target
     let processed = pcm16k;
@@ -163,6 +168,7 @@ export class AudioSwitchboard extends EventEmitter {
       this.calleeClient.sendAudio(processed);
       this.emit('monitorAudio', {
         speaker: 'caller',
+        isHuman: true,
         buffer: AudioResampler.upsample16kTo24k(processed),
         sampleRate: 24000,
       });
@@ -170,6 +176,7 @@ export class AudioSwitchboard extends EventEmitter {
       this.callerClient.sendAudio(processed);
       this.emit('monitorAudio', {
         speaker: 'callee',
+        isHuman: true,
         buffer: AudioResampler.upsample16kTo24k(processed),
         sampleRate: 24000,
       });
