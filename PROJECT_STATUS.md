@@ -1,155 +1,249 @@
-# Talk Dojo 🥋 — Project Status & Architecture Guide for AI Agents
+# Talk Dojo — Current Project Status
 
-**Last Updated:** August 30, 2026
-**Repository:** `talk-dojo`  
-**Test Status:** ✅ All 8 unit test suites passing (`npm test`)  
-**Dev Server:** Run `npm run dev` and open `http://localhost:3000`
+**Last updated:** August 30, 2026
 
----
+**Release:** 1.0.0-beta.1
 
-## 1. Executive Summary & Mission
+**Branch:** `main`
 
-**Talk Dojo** is an enterprise-grade AI telephony simulation, sparring, certification, and deployment platform. It enables organizations to:
-1. Define company identity with dynamic Markdown section cards (`SEC-xxx`), phonetics, acronyms, and contact information.
-2. Author MCP-compatible tools with explicit parameter schemas, example call parameters, expected response schemas, and call responses.
-3. Establish immutable compliance policies (`POL-xxx`) classified as **Always**, **Never**, or **Conditional**.
-4. Define authorized procedures (`PROC-xxx`) that constrain tool usage at the endpoint/action level.
-5. Author standalone test scenarios (`TEST-xxx`) linked to multiple policies and procedures with proactive coverage-gap detection.
-6. Configure one virtual phone assistant per account with an authentic backstory, conversational guidelines, and Gemini Multimodal Live voice timbre (`Aoede`, `Fenrir`, `Charon`, `Kore`, or `Puck`).
-7. Spar live with the assistant inside an embedded voice-first call window where the actual LLM streams native spoken audio.
-8. Certify assistants against all enabled standalone scenarios in either ultra-fast Text mode or high-fidelity Voice telephony mode, streaming turns live with interactive **Pause**, **Continue**, and **Restart** controls.
-9. Create immutable configuration snapshots and manage active production deployments with safety audit logs.
+**Verification:** `npm test` passing; current UI flows browser-verified without runtime errors
 
----
+**Local server:** `npm start` or `npm run dev`, defaulting to `http://localhost:3000`
 
-## 2. Navigation Hierarchy & Route Structure
+This is the authoritative technical status document. The former agent handoff document has been retired because its durable content is consolidated here.
 
-The UI follows an intentional 8-tier sequential hierarchy:
-```
-1. 🏢 Account              -> /#/account/:accountId/info
-2. 🛠️ Tools                -> /#/account/:accountId/tools/all?id=<toolId>  |  /#/account/:accountId/tools/new
-3. 📜 Policies             -> /#/account/:accountId/policies/all_enabled?id=<policyId>
-4. 📋 Procedures           -> /#/account/:accountId/procedures/all_enabled?id=<procId>
-5. 🏦 Test Scenarios       -> /#/account/:accountId/testscenarios/all?id=<testId>
-6. 🤖 Assistant            -> /#/account/:accountId/assistant/edit
-7. 🏆 Certification        -> /#/account/:accountId/certification/history  |  /#/account/:accountId/certification/new
-8. ⚙️ Account Settings     -> /#/account/:accountId/accountsettings/overview
+## Current State
+
+Talk Dojo supports multiple accounts, with exactly one telephone assistant per account. Each account contains company context, virtual tools, policies, procedures, standalone tests, certification history, and recoverable deleted business objects.
+
+The current sidebar sequence is:
+
+```text
+Company Profile → Tools → Policies → Procedures → Test Scenarios
+→ Assistant → Certification
+
+Account Settings is anchored separately at the bottom.
 ```
 
-### Hash-Based Deep Linking Convention
-- All screen transitions, entity selections, and account selections update `window.location.hash`.
-- URLs use parent account GUIDs and clean entity identifiers (e.g. `/#/account/acct-smk-7b9e2f41/policies/all_enabled?id=POL-001`).
-- Reloading or sharing direct URLs restores that exact view, account context, and selects that specific item.
+There is no global top header. Account switching is available only through **Account Settings**, using a modal of account summary cards. API configuration and Recycle Bin access also live there.
 
----
+## Completed Architecture
 
-## 3. Core Architectural Subsystems
+### Accounts and Company Profiles
 
-### A. Account Management & Dynamic Markdown (`src/account/account-manager.js`)
-- Stores business data under `data/accounts/<account-id>/account.yaml` and `company_info.md`.
-- Dynamic Markdown sections are parsed into visual cards labeled with reference badges (`SEC-001`, `SEC-002`, etc.).
-- Includes a raw Markdown toggle to edit the unified markdown file directly.
+- Account metadata: `data/accounts/<account-id>/account.yaml`.
+- Company knowledge: `data/accounts/<account-id>/company_info.md`.
+- Markdown headings are parsed into editable `SEC-xxx` cards.
+- Hash routes preserve the account context and selected entity.
 
-### B. Tools Manager (`src/tools/virtual-tool-manager.js`)
-- Stores tool definitions under `data/accounts/<account-id>/virtual-tools/`.
-- Tools expose normalized function declarations: `parameters`, `example_call_parameters`, `expected_response_schema`, and `example_call_response`.
-- AI generation displays an animated circle spinner with an elapsed seconds timer (`Waiting: 0s`, `Waiting: 1s`...) and status messages.
+### Singleton Assistant
 
-### C. Policies Tab (`POL-xxx`)
-- Dedicated top-level tab for immutable compliance rules.
-- Types:
-  - **Always**: Mandatory actions executed on every call (e.g. HIPAA 2-factor verification).
-  - **Never**: Strict prohibitions and compliance guardrails (e.g. never give medical advice).
-  - **Conditional**: Triggered requirements with explicit condition prompts and directives.
-- Each policy receives a clean reference ID (`POL-001`, `POL-002`, etc.) so violations can be reported directly by ID.
+- Canonical path: `data/accounts/<account-id>/assistant.yaml`.
+- APIs: `GET` and `POST /api/accounts/:id/assistant`.
+- The UI opens directly into the singular Assistant editor.
+- No assistant list, create flow, selector, or delete operation exists.
+- Startup migration chooses one legacy assistant, removes the old `assistants/` directory, and removes assistant Recycle Bin artifacts.
+- Certification, chat, prompt compilation, and batch execution resolve the sole assistant automatically.
 
-### D. Procedures Tab (`PROC-xxx`)
-- Dedicated top-level tab between Policies and Test Scenarios.
-- Procedures authorize and constrain tool usage with checkboxes.
-- Strict prompt mandate enforces that if a caller request falls outside enabled procedures, the assistant **must politely decline**.
-- Covering standalone test scenarios are linked from procedure detail views.
-- Granular `authorized_actions` select individual virtual-tool endpoints.
+### Tools and Procedure Authorization
 
-### E. Standalone Test Scenarios (`TEST-xxx`)
-- Stored at `data/accounts/<account-id>/test-scenarios/<test-id>.yaml`.
-- Link to multiple policies and procedures and define customer personas, private instructions, and evaluation checklists.
-- Coverage warnings flag enabled policies and procedures not referenced by any enabled scenario.
-- Certification maps linked procedure actions into an isolated assistant toolbelt.
+- Tools are stored under `data/accounts/<account-id>/virtual-tools/`.
+- Each service contains normalized callable endpoints with parameters, examples, expected schemas, and example responses.
+- Tools belong to the account, not the assistant.
+- Procedures authorize specific endpoint names through `authorized_actions`.
+- Certification constructs an isolated toolbelt from actions authorized by linked procedures.
 
-### F. Account Assistant (`data/accounts/<account-id>/assistant.yaml`)
-- Exactly one assistant is permitted per account and opens directly in a singular editor.
-- Legacy `assistants/` directories are migrated destructively; one canonical record is retained and no assistant backup/recycle artifact is created.
-- **Voice Timbre Clarity & Gemini Live Bidi Previews**:
-  - `Aoede`: Female timbre · Warm, breezy & natural (~240 Hz).
-  - `Fenrir`: Male timbre · Deep, resonant & authoritative (~110 Hz).
-  - `Charon`: Male timbre · Calm, clinical & measured (~140 Hz).
-  - `Kore`: Female timbre · Bright, cheerful & energetic (~280 Hz).
-  - `Puck`: Male/Neutral timbre · Casual, conversational (~175 Hz).
-  - Endpoint `GET /api/voice-preview/:voiceName` streams genuine spoken native audio from Gemini Live WebSocket (`models/gemini-2.5-flash-native-audio-latest`), cached on disk in `data/voice-previews/<voice>.wav`.
-- **Embedded Voice-First Chat Window**:
-  - Embedded in the assistant edit pane with Freeform Sandbox, Bank Scenario, and Pasted Scenario modes.
-  - Modalities: `Text ⚡`, `Voice 🎙️`, `Hybrid 🔀`.
+### Policies and Procedures
 
-### G. Prompt Compilation: Strict 6-Block Specification
-When compiling the system prompt for an assistant (`compileAssistantPrompt`), it merges:
-1. `=== BLOCK 1: BUSINESS CONTEXT & COMPANY INFORMATION ===`
-2. `=== BLOCK 2: IMMUTABLE POLICIES & COMPLIANCE RULES ===` (Always, Never, Conditional with `[POL-xxx]`)
-3. `=== BLOCK 3: AUTHORIZED PROCEDURES & WORKFLOW CONSTRAINTS ===` (Mandate to politely decline unmapped requests)
-4. `=== BLOCK 4: ASSISTANT PERSONA & VOCAL CADENCE ===`
-5. `=== BLOCK 5: CONVERSATIONAL GUIDELINES & TELEPHONY MANNERS ===`
-6. `=== BLOCK 6: TOOL INSTRUCTIONS & CAPABILITIES ===`
+- Policies are stored as YAML and expose clean `POL-xxx` references.
+- Supported policy types are `always`, `never`, and `conditional`.
+- Procedures use `PROC-xxx` references, ordered steps, constraints, and granular tool authorization.
+- Prompt compilation explicitly requires polite refusal of workflows outside enabled procedures.
 
-### H. Certification & Deployment Manager (`src/certification/certification-manager.js`)
-- Snapshots freeze company info, policies (`POL-xxx`), procedures (`PROC-xxx`), virtual tools, assistant, and test results.
-- Certification runner tests all enabled top-level scenarios.
-- Instant live streaming over WebSocket with Pause, Continue, and Restart controls.
-- Active production deployment management with audit logs.
+### Standalone Test Scenarios
 
-### I. Recycle Bin & Soft-Delete Archive
-- Path: `data/accounts/<account-id>/recycle-bin/`
-- Tool, policy, procedure, and scenario deletions are soft-deleted into the recycle bin. The singleton assistant cannot be deleted.
-- Accessible via the bottom sidebar drawer to restore items or permanently clear them to the audit archive.
+- Canonical path: `data/accounts/<account-id>/test-scenarios/<test-id>.yaml`.
+- Scenarios are top-level entities, not procedure-owned records.
+- They link to multiple policy and procedure references.
+- They include customer persona, private instructions, objectives, turn limits, and required evaluation criteria.
+- Coverage analysis flags any enabled policy or procedure not referenced by an enabled scenario.
+- Gap tooling can create drafts and suggest relevant links.
+- Scenario ID allocation considers active and recycled records to prevent accidental reuse.
 
-### J. Rich Demo Account Data
-- Startup enrichment is idempotent and adds only missing named records.
-- Each visible demo account has nine company-profile sections, at least seven policies, at least three multi-endpoint tool services, and four or more enabled test scenarios.
-- Domain coverage includes patient billing and advocacy, civil-litigation intake, real-estate transactions, property management, privacy, emergency escalation, and adversarial guardrail tests.
+### Prompt Compilation
 
----
+`AccountManager.compileAssistantPrompt(accountId)` produces six blocks:
 
-## 4. Key Endpoints Reference
+1. Business context and company information.
+2. Immutable policies and compliance rules.
+3. Authorized procedures and workflow constraints.
+4. Assistant persona and vocal cadence.
+5. Conversational and telephony guidelines.
+6. Tool instructions and capabilities.
 
-| Method | Endpoint | Description |
+### Chat, Audio, and Certification
+
+- Assistant sparring supports freeform, bank-scenario, and pasted-scenario modes.
+- Modalities include text, voice, and hybrid interaction.
+- Gemini Live voice previews are cached as WAV files.
+- Certification automatically targets the account assistant and asks only for Text or Voice mode.
+- WebSockets stream certification progress and transcript turns.
+- Snapshots freeze company info, policies, procedures, tools, assistant configuration, and results.
+- Deployment status remains available in Certification history; it is no longer displayed in global chrome.
+
+### Account Settings and Recycle Bin
+
+- Account Settings is a neutral/cyan bottom-sidebar control with no count badge.
+- The account-card modal displays the assistant name and entity counts for each account.
+- The Gemini API key can be updated from Account Settings.
+- Policies, procedures, and scenarios are soft-deleted into the account Recycle Bin.
+- Tool deletion is currently permanent and bypasses the Recycle Bin.
+- The singleton assistant cannot be deleted.
+
+## Demo Workspace Status
+
+`src/account/demo-data-enhancements.js` defines idempotent enrichment for the recognized demo workspaces. It uses stable section headings and record IDs, adding only missing data.
+
+Current local demo totals:
+
+| Account | Profile sections | Policies | Tool services | Test scenarios |
+|---|---:|---:|---:|---:|
+| Jade Law for Justice / healthcare advocacy sandbox | 9 | 7 | 4 | 4 |
+| Arm & A Leg Medical Billing Co. / compatible `acct-smk-*` medical account | 9 | 8 | 3 | 6 |
+| Sterling & Sterling LLP | 9 | 8 | 3 | 5 |
+| Vanguard Realty Group & Property Management | 9 | 7 | 3 | 5 |
+
+Fresh installations seed the three canonical medical, legal, and real-estate accounts. The Jade sandbox is enriched only when that existing account is present.
+
+## Route Map
+
+```text
+/#/account/:accountId/info
+/#/account/:accountId/tools/all?id=<toolId>
+/#/account/:accountId/tools/new
+/#/account/:accountId/policies/<filter>?id=<policyId>
+/#/account/:accountId/procedures/<filter>?id=<procedureId>
+/#/account/:accountId/testscenarios/<filter>?id=<testId>
+/#/account/:accountId/testscenarios/new
+/#/account/:accountId/assistant/edit
+/#/account/:accountId/certification/history
+/#/account/:accountId/certification/new
+/#/account/:accountId/accountsettings/overview
+```
+
+Legacy `assistants` route segments normalize to the singular Assistant pane for bookmark compatibility; no plural assistant API remains.
+
+## API Inventory
+
+### Configuration and Accounts
+
+| Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/accounts` | List accounts (GUIDs) |
-| `GET` | `/api/accounts/:id` | Get account details |
-| `GET/POST` | `/api/accounts/:id/company-info` | Get/Save Markdown section cards (`SEC-xxx`) |
-| `GET/POST` | `/api/accounts/:id/policies` | List/Save immutable compliance policies (`POL-xxx`) |
-| `DELETE` | `/api/accounts/:id/policies/:policyId` | Soft-delete policy |
-| `GET/POST` | `/api/accounts/:id/procedures` | List/Save procedures (`PROC-xxx`) |
-| `DELETE` | `/api/accounts/:id/procedures/:procId` | Soft-delete procedure |
-| `GET/POST` | `/api/accounts/:id/test-scenarios` | List or save standalone test scenarios |
-| `GET` | `/api/accounts/:id/test-scenarios/gaps` | Calculate enabled policy/procedure coverage gaps |
-| `POST` | `/api/accounts/:id/test-scenarios/suggest-links` | Suggest policy and procedure links |
-| `GET/POST` | `/api/accounts/:id/virtual-tools` | List/Save normalized MCP tool endpoints |
-| `POST` | `/api/accounts/:id/virtual-tools/describe` | AI tool generation endpoint |
-| `GET/POST` | `/api/accounts/:id/assistant` | Get or save the account's sole assistant |
-| `GET` | `/api/voice-preview/:voiceName` | Spoken preview WAV from Gemini Live cache |
-| `POST` | `/api/chat/assistant-turn` | Single turn (returns text + native audioBase64) |
-| `POST` | `/api/chat/review-interaction` | AI referee interaction scoring |
-| `POST` | `/api/accounts/:id/certification/certify` | Run sequential batch certification across all enabled procedures |
-| `GET` | `/api/accounts/:id/certification/snapshots` | List past certification snapshots |
-| `POST` | `/api/accounts/:id/certification/snapshots/:id/deploy` | Deploy snapshot as active configuration |
-| `GET` | `/api/accounts/:id/recycle-bin` | List soft-deleted items |
-| `POST` | `/api/accounts/:id/recycle-bin/:itemId/restore` | Restore soft-deleted item |
+| `GET` | `/api/config` | Report whether runtime configuration is present |
+| `POST` | `/api/config/key` | Update the runtime Gemini API key |
+| `GET` | `/api/accounts` | List accounts and summary counts |
+| `GET` | `/api/accounts/:id` | Get an account and its company context |
+| `POST` | `/api/accounts` | Create or update an account |
+| `GET/POST` | `/api/accounts/:id/company-info` | Read or save company Markdown/sections |
 
----
+### Policies, Procedures, Tests, and Tools
 
-## 5. Critical Directives for Future AI Agents
+| Method | Path | Purpose |
+|---|---|---|
+| `GET/POST` | `/api/accounts/:id/policies` | List or save policies |
+| `DELETE` | `/api/accounts/:id/policies/:policyId` | Soft-delete a policy |
+| `GET/POST` | `/api/accounts/:id/procedures` | List or save procedures |
+| `DELETE` | `/api/accounts/:id/procedures/:procedureId` | Soft-delete a procedure |
+| `GET/POST` | `/api/accounts/:id/test-scenarios` | List or save standalone scenarios |
+| `DELETE` | `/api/accounts/:id/test-scenarios/:testId` | Soft-delete a scenario |
+| `GET` | `/api/accounts/:id/test-scenarios/gaps` | Calculate coverage gaps |
+| `POST` | `/api/accounts/:id/test-scenarios/generate-gap-drafts` | Create draft tests for gaps |
+| `POST` | `/api/accounts/:id/test-scenarios/suggest-links` | Suggest policy/procedure links |
+| `GET/POST` | `/api/accounts/:id/virtual-tools` | List or save tool services |
+| `DELETE` | `/api/accounts/:id/virtual-tools/:toolId` | Delete a tool service |
+| `POST` | `/api/accounts/:id/virtual-tools/describe` | Generate a tool schema with AI |
 
-1. **No Data In Git**: The `data/` directory and `.env*` files are strictly excluded via `.gitignore`.
-2. **Guid Deep-Links**: Always preserve the `/#/account/:accountId/...` URL convention with GUID identifiers.
-3. **Strict Procedures Enforcement**: Assistants must only execute workflows and tools defined in enabled procedures; unmapped requests must be politely declined.
-4. **Auto-Growing Textareas**: Any multi-line input must use the `.auto-grow` class so that text content expands dynamically without internal scrollbars.
-5. **Maintain All Test Suites**: Before ending your turn, always verify with `npm test`. All test suites must pass without regressions.
-6. **Singleton Assistant Invariant**: Never reintroduce assistant lists, assistant selectors, plural assistant storage, or assistant deletion.
+### Assistant, Chat, and Certification
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET/POST` | `/api/accounts/:id/assistant` | Read or update the sole assistant |
+| `POST` | `/api/accounts/:id/assistant/describe` | Generate/refine an assistant persona |
+| `GET` | `/api/voice-preview/:voiceName` | Return a cached/generated voice preview |
+| `POST` | `/api/chat/assistant-turn` | Run one assistant interaction turn |
+| `POST` | `/api/chat/review-interaction` | Evaluate an interaction |
+| `POST` | `/api/accounts/:id/certification/certify` | Start certification |
+| `GET` | `/api/accounts/:id/certification/snapshots` | List certification snapshots |
+| `POST` | `/api/accounts/:id/certification/snapshots/:snapshotId/deploy` | Deploy a snapshot |
+| `GET` | `/api/accounts/:id/certification/active` | Read active deployment data |
+| `POST` | `/api/accounts/:id/certification/pause` | Pause certification |
+| `POST` | `/api/accounts/:id/certification/resume` | Resume certification |
+| `POST` | `/api/accounts/:id/certification/abort` | Abort certification |
+
+### Recycle Bin
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/accounts/:id/recycle-bin` | List recoverable records |
+| `POST` | `/api/accounts/:id/recycle-bin/:binItemId/restore` | Restore a record |
+| `DELETE` | `/api/accounts/:id/recycle-bin` | Clear records into the audit archive |
+
+## Important Files
+
+| File | Responsibility |
+|---|---|
+| `src/account/account-manager.js` | Account storage, migrations, CRUD, coverage analysis, prompt compilation, and base seeding |
+| `src/account/demo-data-enhancements.js` | Idempotent rich demo sections, policies, tools, and tests |
+| `src/tools/virtual-tool-manager.js` | Tool schema normalization and storage |
+| `src/runner/batch-runner.js` | Scenario runtime construction and sequential execution |
+| `src/certification/certification-manager.js` | Snapshots, certification lifecycle, and deployment history |
+| `src/server.js` | Express and WebSocket APIs |
+| `public/index.html` | Application structure and dialogs |
+| `public/js/app.js` | Client state, routing, forms, account switching, chat, and certification UI |
+| `public/css/style.css` | Sidebar, editors, status, modal, and responsive presentation |
+| `test/unit-test.js` | Main regression suite |
+
+## Verification Status
+
+The current `npm test` run passes and covers:
+
+- Telephony tones, line impairment, resampling, and WAV encoding.
+- Procedure/scenario schema normalization.
+- Isolated tool execution and calendar synchronization.
+- Account, company profile, policy, procedure, tool, and Recycle Bin behavior.
+- Six-block assistant prompt compilation.
+- Standalone scenario runtime mapping and private caller instructions.
+- Collision-safe scenario identifiers.
+- Idempotent demo-data enrichment.
+- Destructive plural-to-single assistant migration.
+- Certification snapshots and active deployment history.
+
+The current browser verification confirms:
+
+- No global header, account dropdown, active pill, or API-key status dot.
+- Direct singular Assistant editing.
+- Clean Account Settings footer styling with no Recycle Bin count.
+- Account-card switching.
+- Enriched company, tool, policy, and scenario views.
+- Certification assistant auto-selection.
+- No observed client runtime errors.
+
+## Maintainer Invariants
+
+1. Preserve exactly one `assistant.yaml` per account.
+2. Do not reintroduce assistant collections, assistant selection, or assistant deletion.
+3. Keep account switching and API configuration in Account Settings; do not restore global header controls.
+4. Keep test scenarios top-level and link them to policies/procedures by stable references.
+5. Authorize tools through procedure actions, never directly on the assistant.
+6. Preserve the `/#/account/:accountId/...` deep-link convention.
+7. Keep multi-line inputs auto-growing without internal scrollbars.
+8. Keep runtime data and secrets outside Git.
+9. Keep demo enrichment idempotent and additive.
+10. Run `npm test` after implementation changes.
+
+## Known Operational Notes
+
+- Voice previews, live voice interaction, AI generation, and automated judging require a valid Gemini API key and network access.
+- `npm run test:models` and `npm run test:simulation` are integration-oriented and may consume API quota.
+- The `data/` directory is intentionally untracked; code-based migrations and demo enrichment apply runtime changes at startup.
+- Historical certification snapshots may retain assistant IDs even though the live model now has one assistant per account.
